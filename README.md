@@ -59,9 +59,9 @@ As regras do banco liberam edição apenas aos UUIDs explicitamente cadastrados.
 
 O [GitHub Pages](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/about-custom-domains-and-github-pages) está disponível para repositórios públicos no GitHub Free; repositórios privados exigem um plano compatível. Não tornar um repositório privado público sem decidir isso com vocês.
 
-### 3. Domínio depois da compra
+### 3. Domínio próprio
 
-O nome considerado é **camylle-teske.com.br** — “Teske”, como o nome da Camy. Confirmar a grafia antes da compra. O endereço não foi registrado nem sua disponibilidade foi confirmada aqui.
+O domínio do portfólio é **camylle-teske.com.br**. Para conectá-lo ao GitHub Pages, configurar o domínio no GitHub, os registros DNS no Registro.br e as URLs de autenticação no Supabase.
 
 1. Verificar a propriedade do domínio nas configurações de Pages do GitHub.
 2. No repositório, ir a **Settings > Pages > Custom domain**, adicionar `camylle-teske.com.br` e salvar antes de configurar o DNS.
@@ -69,15 +69,16 @@ O nome considerado é **camylle-teske.com.br** — “Teske”, como o nome da C
 
    | Nome | Tipo | Valor |
    | --- | --- | --- |
-   | `@` / raiz | A | `185.199.108.153` |
-   | `@` / raiz | A | `185.199.109.153` |
-   | `@` / raiz | A | `185.199.110.153` |
-   | `@` / raiz | A | `185.199.111.153` |
+   | (vazio) | A | `185.199.108.153` |
+   | (vazio) | A | `185.199.109.153` |
+   | (vazio) | A | `185.199.110.153` |
+   | (vazio) | A | `185.199.111.153` |
    | `www` | CNAME | `rafadorn.github.io` |
 
-   O campo da raiz pode ficar vazio no editor DNS do Registro.br. Usar o usuário real do repositório no CNAME e não incluir o nome do repositório nesse valor.
-4. Após a verificação do DNS, habilitar **Enforce HTTPS** no Pages e executar novamente o workflow para publicar com o caminho base `/`.
-5. Atualizar as URLs de autenticação do Supabase para o domínio comprado e testar a recuperação de senha.
+   No editor DNS do Registro.br, deixar o campo Nome vazio nas quatro entradas A: o caractere `@` não é aceito. No CNAME, usar `www` como Nome e `rafadorn.github.io` como valor, sem `https://` e sem o nome do repositório. Se a zona estiver em transição, aguardar sua liberação antes de adicionar as entradas.
+4. Depois de salvar o domínio no Pages, iniciar uma nova execução em **Actions > Publicar portfólio > Run workflow**. O workflow calcula o caminho base `/` automaticamente. Uma nova execução usa seus próprios artefatos; reexecutar o build de uma execução já concluída pode gerar artefatos duplicados e impedir o deploy.
+5. Após a verificação do DNS, habilitar **Enforce HTTPS** no Pages.
+6. Em **Supabase > Authentication > URL Configuration**, usar `https://camylle-teske.com.br/` como **Site URL** e adicionar `https://camylle-teske.com.br/admin/?senha=alterar` em **Redirect URLs**. Testar o login e a recuperação de senha no domínio novo.
 
 Com o domínio raiz configurado, o GitHub pode redirecionar `www` para o endereço sem `www`. Não é necessário comprar hospedagem junto com o domínio para esta estrutura.
 
