@@ -1,0 +1,21 @@
+{
+  "name": "camylle-teske-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "node scripts/generate-pages.mjs && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "playwright": "^1.64.0",
+    "vite": "^8.3.4"
+  }
+}

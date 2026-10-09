@@ -1,0 +1,130 @@
+[
+  {
+    "id": "8b64b72b-733f-5a6d-9d5f-af54ea46f1e3",
+    "slug": "odara-tattoo",
+    "title": "Odara Tattoo",
+    "category": "Identidade visual",
+    "description": "Identidade visual para Odara Tattoo, apresentada em uma aplicação impressa.",
+    "position": 1,
+    "status": "published",
+    "cover_layout": "single",
+    "cover_path": "8b64b72b-733f-5a6d-9d5f-af54ea46f1e3/odara.jpeg",
+    "media": [
+      {
+        "path": "8b64b72b-733f-5a6d-9d5f-af54ea46f1e3/odara.jpeg",
+        "local": "images/odara.jpeg",
+        "alt": "Aplicação impressa da identidade Odara Tattoo."
+      }
+    ]
+  },
+  {
+    "id": "2f5c53de-58c2-59b8-a4ae-205fa0bb7f2a",
+    "slug": "leao-ice-bubble-tea",
+    "title": "Leão Ice Bubble Tea",
+    "category": "Design de embalagem",
+    "description": "Estudo de embalagem para Leão Ice Bubble Tea.",
+    "position": 2,
+    "status": "published",
+    "cover_layout": "single",
+    "cover_path": "2f5c53de-58c2-59b8-a4ae-205fa0bb7f2a/leao.jpeg",
+    "media": [
+      {
+        "path": "2f5c53de-58c2-59b8-a4ae-205fa0bb7f2a/leao.jpeg",
+        "local": "images/leao.jpeg",
+        "alt": "Embalagens do projeto Leão Ice Bubble Tea."
+      }
+    ]
+  },
+  {
+    "id": "965505a2-b2b9-5b10-b127-d73b42413199",
+    "slug": "pace-delas",
+    "title": "Pace Delas",
+    "category": "Mídias sociais / 2026",
+    "description": "Seleção de peças para as mídias sociais da Pace Delas.",
+    "position": 3,
+    "status": "published",
+    "cover_layout": "triptych",
+    "cover_path": "965505a2-b2b9-5b10-b127-d73b42413199/pace-01.jpeg",
+    "media": [
+      {
+        "path": "965505a2-b2b9-5b10-b127-d73b42413199/pace-01.jpeg",
+        "local": "images/pace-01.jpeg",
+        "alt": "Inscrições para o Clube Delas."
+      },
+      {
+        "path": "965505a2-b2b9-5b10-b127-d73b42413199/pace-03.jpeg",
+        "local": "images/pace-03.jpeg",
+        "alt": "Campanha Pace Delas e Wellhub."
+      },
+      {
+        "path": "965505a2-b2b9-5b10-b127-d73b42413199/pace-02.jpeg",
+        "local": "images/pace-02.jpeg",
+        "alt": "Peça de conteúdo para corredoras."
+      }
+    ]
+  },
+  {
+    "id": "95bf9b37-9937-5c6b-84de-d8f7e2f6816e",
+    "slug": "igara-saude",
+    "title": "Ígara Saúde",
+    "category": "Mídias sociais / 2026",
+    "description": "Conteúdo digital para Ígara Saúde, com peças voltadas à comunicação sobre saúde mental.",
+    "position": 4,
+    "status": "published",
+    "cover_layout": "triptych",
+    "cover_path": "95bf9b37-9937-5c6b-84de-d8f7e2f6816e/igara.jpeg",
+    "media": [
+      {
+        "path": "95bf9b37-9937-5c6b-84de-d8f7e2f6816e/igara.jpeg",
+        "local": "images/igara.jpeg",
+        "alt": "Conteúdo sobre cuidar da saúde mental."
+      },
+      {
+        "path": "95bf9b37-9937-5c6b-84de-d8f7e2f6816e/psico-02.jpeg",
+        "local": "images/psico-02.jpeg",
+        "alt": "Conteúdo sobre terapia."
+      },
+      {
+        "path": "95bf9b37-9937-5c6b-84de-d8f7e2f6816e/psico-01.jpeg",
+        "local": "images/psico-01.jpeg",
+        "alt": "Conteúdo sobre rotina no inverno."
+      }
+    ]
+  },
+  {
+    "id": "84283e64-31bd-5b91-9b2b-4be628ed00e1",
+    "slug": "vestis",
+    "title": "Vestis",
+    "category": "Design de marca",
+    "description": "Design de marca para Vestis.",
+    "position": 5,
+    "status": "published",
+    "cover_layout": "single",
+    "cover_path": "84283e64-31bd-5b91-9b2b-4be628ed00e1/vestis.png",
+    "media": [
+      {
+        "path": "84283e64-31bd-5b91-9b2b-4be628ed00e1/vestis.png",
+        "local": "images/vestis.png",
+        "alt": "Marca Vestis em branco sobre fundo escuro."
+      }
+    ]
+  },
+  {
+    "id": "5d43a37b-9832-5eaa-9b08-8d3761d7252e",
+    "slug": "feito-por-d",
+    "title": "Feito por D",
+    "category": "Identidade visual & embalagem",
+    "description": "Identidade visual aplicada à embalagem da marca Feito por D.",
+    "position": 6,
+    "status": "published",
+    "cover_layout": "single",
+    "cover_path": "5d43a37b-9832-5eaa-9b08-8d3761d7252e/feito-por-d.jpeg",
+    "media": [
+      {
+        "path": "5d43a37b-9832-5eaa-9b08-8d3761d7252e/feito-por-d.jpeg",
+        "local": "images/feito-por-d.jpeg",
+        "alt": "Marca Feito por D aplicada em embalagem."
+      }
+    ]
+  }
+]
