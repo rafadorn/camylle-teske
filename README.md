@@ -15,7 +15,10 @@ O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel 
 - Importar os seis projetos iniciais pelo próprio painel.
 - Publicação automática pelo GitHub Actions e suporte a domínio próprio.
 
-**Estado:** código implementado e verificado localmente. O projeto Supabase foi criado e a conta da Camy foi liberada pelo usuário. A URL e a chave publicável recebida estão configuradas em `supabase/public-config.json`. O repositório é [rafadorn/camylle-teske](https://github.com/rafadorn/camylle-teske). Ainda falta ativar o GitHub Pages, entrar no painel publicado e importar os seis trabalhos. A conexão com a instância real ainda precisa ser verificada pelo site publicado; o ambiente de desenvolvimento está com o acesso ao endereço Supabase bloqueado. Nenhuma edição é simulada ou salva no navegador.
+**Estado:** site e painel publicados pelo GitHub Pages, com os 10 testes aprovados também no GitHub Actions. O projeto Supabase foi criado e a conta da Camy foi liberada pelo usuário. A URL e a chave publicável recebida estão configuradas em `supabase/public-config.json`. O repositório é [rafadorn/camylle-teske](https://github.com/rafadorn/camylle-teske). Ainda falta verificar o primeiro login na conta real e importar os seis trabalhos pelo painel. O ambiente de desenvolvimento não tem acesso direto ao Supabase, e a ferramenta de navegação não conseguiu abrir o novo endereço; a publicação foi confirmada pelo resultado de sucesso do GitHub. Nenhuma edição é simulada ou salva no navegador.
+
+- [Abrir portfólio](https://rafadorn.github.io/camylle-teske/)
+- [Abrir painel da Camy](https://rafadorn.github.io/camylle-teske/admin/)
 
 ## Ativação única
 
@@ -33,7 +36,7 @@ O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel 
    ```
 
 5. A URL e a chave **Publishable** (`sb_publishable_...`) da Camy já estão em `supabase/public-config.json`. Para outra instância, atualizar esse arquivo ou fornecer o par de variáveis de ambiente. A chave `anon` legada também funciona. Não usar `service_role` ou `sb_secret_...` no site.
-6. Em **Authentication > URL Configuration**, definir o endereço do site e adicionar o endereço exato da recuperação de senha à lista de redirecionamentos:
+6. Em **Authentication > URL Configuration**, definir **Site URL** como `https://rafadorn.github.io/camylle-teske/` e adicionar o endereço exato da recuperação de senha a **Redirect URLs**:
    - Sem domínio: `https://rafadorn.github.io/camylle-teske/admin/?senha=alterar`
    - Com domínio: `https://camylle-teske.com.br/admin/?senha=alterar`
 7. Verificar o envio dos e-mails de recuperação. Para entrega regular em produção, configurar SMTP próprio conforme a [documentação de e-mail do Supabase](https://supabase.com/docs/guides/auth/auth-smtp).
