@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { BUCKET, recordForSave } from './project.js';
+import { authOptionsForLocation, secureAuthLocation, sessionExpired } from './security.js';
 
 const url = import.meta.env.VITE_SUPABASE_URL || '';
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -11,7 +12,9 @@ if (key.split('.').length === 3) {
   } catch (error) { if (error.message.includes('service_role')) throw error; }
 }
 export const configured = Boolean(url && key);
-export const client = configured ? createClient(url, key) : null;
+export const secureConnection = secureAuthLocation(globalThis.location);
+// Public HTTP pages can read published work, but never restore or consume an authenticated session.
+export const client = configured ? createClient(url, key, { auth: authOptionsForLocation(globalThis.location) }) : null;
 
 function check(result) {
   if (result.error) throw result.error;
@@ -22,6 +25,9 @@ export function friendlyError(error) {
   if (error?.code === '23505') return 'Esse endereço já pertence a outro trabalho. Escolha outro.';
   if (error?.code === '42501' || /row.level security|permission denied/i.test(error?.message || '')) return 'Sua conta não tem permissão para editar o portfólio.';
   if (/Invalid login credentials/i.test(error?.message || '')) return 'E-mail ou senha incorretos.';
+  if (sessionExpired(error)) return 'Sua sessão terminou. Entre novamente para continuar.';
+  if (/rate.limit|too many requests/i.test(`${error?.code || ''} ${error?.message || ''}`)) return 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.';
+  if (error?.code === 'same_password') return 'Escolha uma senha diferente da atual.';
   if (/fetch|network|Failed to fetch/i.test(error?.message || '')) return 'Não foi possível conectar. Confira sua internet e tente novamente.';
   return error?.message || 'Não foi possível concluir. Tente novamente.';
 }
@@ -57,9 +63,11 @@ export async function removeImages(paths) {
   if (paths.length) check(await client.storage.from(BUCKET).remove(paths));
 }
 
-export async function deleteProject(id, paths) {
+export async function deleteProject(id, paths, shouldContinue = () => true) {
+  if (!shouldContinue()) return;
   // Excluir o registro primeiro remove o acesso público mesmo se a limpeza falhar.
   check(await client.from('projects').delete().eq('id', id));
+  if (!shouldContinue()) return;
   await removeImages(paths);
 }
 

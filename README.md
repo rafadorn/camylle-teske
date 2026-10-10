@@ -15,10 +15,10 @@ O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel 
 - Importar os seis projetos iniciais pelo próprio painel.
 - Publicação automática pelo GitHub Actions e suporte a domínio próprio.
 
-**Estado:** site e painel publicados pelo GitHub Pages, com os 10 testes aprovados também no GitHub Actions. O projeto Supabase foi criado e a conta da Camy foi liberada pelo usuário. A URL e a chave publicável recebida estão configuradas em `supabase/public-config.json`. O repositório é [rafadorn/camylle-teske](https://github.com/rafadorn/camylle-teske). Ainda falta verificar o primeiro login na conta real e importar os seis trabalhos pelo painel. O ambiente de desenvolvimento não tem acesso direto ao Supabase, e a ferramenta de navegação não conseguiu abrir o novo endereço; a publicação foi confirmada pelo resultado de sucesso do GitHub. Nenhuma edição é simulada ou salva no navegador.
+**Estado:** site e painel publicados pelo GitHub Pages em `camylle-teske.com.br`. O usuário confirmou a ativação de HTTPS e o recebimento do e-mail de recuperação. O projeto Supabase foi criado e a conta da Camy foi liberada pelo usuário. A configuração contém somente URL e chave publicável. O repositório é [rafadorn/camylle-teske](https://github.com/rafadorn/camylle-teske). Os testes locais usam um banco e um contrato de API isolados; não comprovam as permissões da instância real, que este ambiente não consegue consultar. A revisão de produção usa a consulta somente leitura `supabase/security-check.sql` e as instruções em `SECURITY.md`.
 
-- [Abrir portfólio](https://rafadorn.github.io/camylle-teske/)
-- [Abrir painel da Camy](https://rafadorn.github.io/camylle-teske/admin/)
+- [Abrir portfólio](https://camylle-teske.com.br/)
+- [Abrir painel da Camy](https://camylle-teske.com.br/admin/)
 
 ## Ativação única
 
@@ -36,12 +36,12 @@ O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel 
    ```
 
 5. A URL e a chave **Publishable** (`sb_publishable_...`) da Camy já estão em `supabase/public-config.json`. Para outra instância, atualizar esse arquivo ou fornecer o par de variáveis de ambiente. A chave `anon` legada também funciona. Não usar `service_role` ou `sb_secret_...` no site.
-6. Em **Authentication > URL Configuration**, definir **Site URL** como `https://rafadorn.github.io/camylle-teske/` e adicionar o endereço exato da recuperação de senha a **Redirect URLs**:
+6. Em **Authentication > URL Configuration**, definir **Site URL** como `https://camylle-teske.com.br/` e adicionar o endereço exato da recuperação de senha a **Redirect URLs**:
    - Sem domínio: `https://rafadorn.github.io/camylle-teske/admin/?senha=alterar`
    - Com domínio: `https://camylle-teske.com.br/admin/?senha=alterar`
 7. Verificar o envio dos e-mails de recuperação. Para entrega regular em produção, configurar SMTP próprio conforme a [documentação de e-mail do Supabase](https://supabase.com/docs/guides/auth/auth-smtp).
 
-As regras do banco liberam edição apenas aos UUIDs explicitamente cadastrados. Um visitante autenticado não ganha permissão. O bucket de novas imagens é privado; somente imagens referenciadas por projetos publicados recebem URLs de leitura temporárias. Ao retirar um projeto do ar, URLs já emitidas podem funcionar por até cinco minutos. Os arquivos originais deste pacote já eram conteúdo público e continuam no repositório; não são arquivos privados.
+As regras do banco liberam edição apenas aos UUIDs explicitamente cadastrados. Um visitante autenticado não ganha permissão. O bucket de novas imagens é privado; somente imagens referenciadas por projetos publicados recebem URLs de leitura temporárias. A interface pede URLs com cinco minutos de validade, mas esse prazo é um parâmetro do cliente, não um teto imposto pelas regras do banco. Links já emitidos podem continuar acessíveis até expirar, e um visitante pode pedir validade maior enquanto a imagem está publicada. Retirar um trabalho do ar impede novas leituras autorizadas pelas regras, mas não recolhe cópias já baixadas. As imagens originais continuam públicas no repositório.
 
 ### 2. GitHub Pages
 
@@ -122,7 +122,7 @@ npm run test:browser
 TEST_BASE_PATH=/camylle-teske/ npm run test:browser
 ```
 
-Os testes de segurança executam o SQL em Postgres via PGlite, com papéis anon/authenticated e identidade simulada. Verificam leitura pública, isolamento de rascunhos e mídias, bloqueio de usuários sem permissão, escrita, publicação, retirada do ar, exclusão e ordenação. Os testes de navegador usam um contrato HTTP controlado do Supabase para verificar a interface. A ativação final deve confirmar esses fluxos na instância real do Supabase, incluindo o e-mail de recuperação.
+Os testes de segurança executam o SQL em Postgres via PGlite, com papéis anon/authenticated e identidade simulada. Verificam leitura pública, isolamento de rascunhos e mídias, bloqueio de usuários sem permissão, escrita, publicação, retirada do ar, exclusão, ordenação e a consulta de auditoria. Os testes de navegador geram um bundle de produção separado com um contrato controlado do Supabase. Verificam CSP, bloqueio do painel em HTTP, menus, contato, recuperação, saída entre abas e telas de 320, 390 e 430 pixels. A configuração de teste nunca é publicada. A ativação final deve confirmar os fluxos na instância real do Supabase.
 
 Dados novos ficam no Supabase, não em commits Git. Fazer backup/exportação do banco e armazenamento conforme o plano contratado. Os limites e condições dos serviços devem ser conferidos nas contas de vocês.
 
