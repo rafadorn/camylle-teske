@@ -1,0 +1,6 @@
+project_id = "camylle-teske"
+
+[functions.record-portfolio-view]
+# The handler verifies a project publishable API key itself. These keys are
+# not JWTs and cannot be validated by the legacy gateway JWT check.
+verify_jwt = false

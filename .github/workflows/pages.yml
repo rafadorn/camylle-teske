@@ -31,6 +31,11 @@ jobs:
       - name: Verificar vulnerabilidades de produção
         run: npm audit --omit=dev --audit-level=high
       - run: npm test
+      - name: Verificar coleta e permissões sem gerar acessos
+        run: node scripts/check-analytics.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
         id: pages
       - run: npm run build

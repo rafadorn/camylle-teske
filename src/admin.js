@@ -1,3 +1,4 @@
+import { mountAnalytics } from './admin-analytics.js';
 import './styles.css';
 import './admin.css';
 import { client, configured, secureConnection, listProjects, saveProject, uploadImage, removeImages, deleteProject, reorderProjects, friendlyError } from './backend.js';
@@ -167,6 +168,7 @@ function overview(notice = '') {
   root.innerHTML = `<section><div class="panel-heading"><div><p class="eyebrow">Seu portfólio</p><h1>Trabalhos</h1><p class="muted">${projects.filter(p => p.status === 'published').length} publicados · ${projects.filter(p => p.status === 'draft').length} rascunhos</p></div><div class="heading-actions"><button class="plain" id="logout" type="button">Sair</button><button class="primary" id="new" type="button">Novo trabalho</button></div></div><p data-message aria-live="polite">${e(notice)}</p><div class="work-list">${projects.map((p, i) => `<article class="work-row"><div class="row-image">${p.media.length ? `<img src="${e((p.media.find(m => m.path === p.cover_path) || p.media[0]).url)}" alt="">` : '<span>Sem capa</span>'}</div><div class="row-info"><h2>${e(p.title)}</h2><p>${e(p.category || 'Categoria a preencher')}</p><span class="status-pill${p.status === 'draft' ? ' draft' : ''}">${p.status === 'published' ? 'Publicado' : 'Rascunho'}</span></div><div class="row-actions"><div class="order-actions"><button type="button" data-move="${i}" data-direction="-1" aria-label="Subir ${e(p.title)}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-move="${i}" data-direction="1" aria-label="Descer ${e(p.title)}" ${i === projects.length - 1 ? 'disabled' : ''}>Descer</button></div><button class="secondary" type="button" data-edit="${p.id}">Editar</button></div></article>`).join('') || '<div class="empty-state"><h2>Seu próximo trabalho começa aqui.</h2><p>Adicione as imagens e conte um pouco sobre o projeto.</p></div>'}</div></section>`;
   root.querySelector('#logout').addEventListener('click', signOut);
   root.querySelector('#new').addEventListener('click', () => openEditor());
+  mountAnalytics(root.querySelector('.work-list'), { client, auth, expired, friendlyError, base });
   root.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openEditor(projects.find(p => p.id === button.dataset.edit))));
   root.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', async () => {
     if (saving) return;

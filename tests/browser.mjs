@@ -5,6 +5,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { readFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
+import { brazilDay } from '../src/analytics-path.js';
 
 const origin = 'http://127.0.0.1:4179';
 const api = 'https://camylle-test.supabase.co';
@@ -13,6 +14,7 @@ const seed = JSON.parse(await readFile(new URL('../src/initial-projects.json', i
 let projects = structuredClone(seed);
 const upload = await readFile(new URL('../public/images/vestis.png', import.meta.url));
 const requests = [];
+const analyticsEvents = [];
 const fixtureDirectory = await mkdtemp(join(tmpdir(), 'camylle-browser-'));
 const fixtureBuild = join(fixtureDirectory, 'dist');
 const fixtureEnv = { ...process.env, VITE_SUPABASE_URL: api, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_BASE_PATH: base };
@@ -64,6 +66,8 @@ try {
     if (url.pathname === '/auth/v1/recover') return recoverFails ? json({ msg: 'Falha temporária no envio.', code: 'email_send_failed' }, 400) : json({});
     if (url.pathname === '/auth/v1/logout') return json({});
     if (url.pathname === '/rest/v1/rpc/portfolio_access') return json(allowAdmin);
+    if (url.pathname === '/rest/v1/rpc/portfolio_analytics') return allowAdmin ? json([{ view_day: brazilDay(), page_path: '/', views: 3 }, { view_day: brazilDay(), page_path: '/sobre/', views: 2 }]) : json({ message: 'permission denied', code: '42501' }, 403);
+    if (url.pathname === '/functions/v1/record-portfolio-view') { analyticsEvents.push({ body, headers: request.headers() }); return route.fulfill({ status: 204 }); }
     if (url.pathname === '/rest/v1/rpc/reorder_projects') { projects = body.project_ids.map((id, i) => ({ ...projects.find(p => p.id === id), position: i + 1 })); return json(null); }
     if (url.pathname === '/rest/v1/projects') {
       if (request.method() === 'GET') return json(projects.filter(p => url.searchParams.get('status') !== 'eq.published' || p.status === 'published').sort((a, b) => a.position - b.position));
@@ -107,6 +111,12 @@ try {
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
   await page.getByRole('heading', { name: 'Trabalhos', exact: true }).waitFor();
   assert.equal(await page.locator('.work-row').count(), 6);
+  await page.getByText('Estatísticas de acesso', { exact: true }).click();
+  await page.getByText('Estatísticas atualizadas.', { exact: true }).waitFor();
+  assert.deepEqual(await page.locator('.analytics-totals dd').allTextContents(), ['5', '5', '5']);
+  assert.equal(await page.locator('.analytics-report > .analytics-table tbody tr').count(), 2);
+  await page.screenshot({ path: 'test-results/analytics-admin.png', fullPage: true });
+  await page.getByText('Estatísticas de acesso', { exact: true }).click();
   await page.getByRole('button', { name: 'Subir Leão Ice Bubble Tea', exact: true }).click();
   await page.getByText('Ordem atualizada no portfólio.').waitFor();
   assert.equal(await page.locator('.row-info h2').first().textContent(), 'Leão Ice Bubble Tea');
@@ -251,6 +261,7 @@ try {
     await mobile.setViewportSize({ width, height: 844 });
     await mobile.goto(origin + base);
     await mobile.locator('.project').first().waitFor();
+    if (await mobile.locator('.privacy-banner').isVisible()) await mobile.getByRole('button', { name: 'Recusar', exact: true }).click();
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow ${width}`);
     assert.equal(await mobile.locator('.project-caption').first().evaluate(node => getComputedStyle(node).opacity), '0', 'touch cards have no green overlay');
     for (const nav of await mobile.locator('nav a').all()) assert.ok((await nav.boundingBox()).height >= 44, 'menu touch target');
@@ -268,12 +279,71 @@ try {
     if (width === 390) await mobile.screenshot({ path: 'test-results/contact-mobile.png', fullPage: true });
     await mobile.getByRole('link', { name: 'Trabalhos', exact: true }).click();
     await mobile.locator('.project').first().waitFor();
+    if (await mobile.locator('.privacy-banner').isVisible()) await mobile.getByRole('button', { name: 'Recusar', exact: true }).click();
     if (width === 390) await mobile.screenshot({ path: 'test-results/portfolio-mobile.png', fullPage: true });
     await mobile.locator('.project').first().tap();
     await mobile.locator('.project-detail').waitFor();
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   }
   await touch.close();
+
+  // Consent is independent of login. Only an explicit acceptance emits a count.
+  const consentContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await consentContext.route(api + '/**', fixture);
+  const consentPage = await consentContext.newPage();
+  consentPage.on('pageerror', error => errors.push(error.message));
+  const beforeConsent = analyticsEvents.length;
+  await consentPage.goto(origin + base + 'sobre/?email=must-not-be-sent#private-fragment');
+  const banner = consentPage.locator('.privacy-banner');
+  await banner.waitFor({ state: 'visible' });
+  assert.equal(analyticsEvents.length, beforeConsent);
+  const accept = await banner.getByRole('button', { name: 'Aceitar estatísticas', exact: true }).boundingBox();
+  const refuse = await banner.getByRole('button', { name: 'Recusar', exact: true }).boundingBox();
+  assert.ok(accept.height >= 44 && refuse.height >= 44 && Math.abs(accept.width - refuse.width) < 1);
+  await consentPage.screenshot({ path: 'test-results/consent-mobile.png' });
+  await banner.getByRole('button', { name: 'Aceitar estatísticas', exact: true }).click();
+  for (let i = 0; analyticsEvents.length === beforeConsent && i < 50; i++) await consentPage.waitForTimeout(50);
+  assert.equal(analyticsEvents.length, beforeConsent + 1);
+  assert.deepEqual(analyticsEvents.at(-1).body, { path: '/sobre/', consent: 'statistics-v1' });
+  for (const header of ['authorization', 'cookie', 'referer']) assert.equal(analyticsEvents.at(-1).headers[header], undefined);
+  await consentPage.reload();
+  await consentPage.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+  for (let i = 0; analyticsEvents.length < beforeConsent + 2 && i < 50; i++) await consentPage.waitForTimeout(50);
+  assert.equal(analyticsEvents.length, beforeConsent + 2);
+  assert.equal(await banner.isVisible(), false);
+  await consentPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  assert.equal(analyticsEvents.length, beforeConsent + 2);
+  await consentPage.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  for (let i = 0; analyticsEvents.length < beforeConsent + 3 && i < 50; i++) await consentPage.waitForTimeout(50);
+  assert.equal(analyticsEvents.length, beforeConsent + 3);
+  await consentPage.getByRole('button', { name: 'Preferências de privacidade', exact: true }).click();
+  await consentPage.getByRole('dialog').getByRole('button', { name: 'Recusar', exact: true }).click();
+  const afterRefusal = analyticsEvents.length;
+  await consentPage.goto(origin + base + 'contato/');
+  await consentPage.getByRole('heading', { name: 'Vamos conversar?', exact: true }).waitFor();
+  assert.equal(await banner.isVisible(), false); assert.equal(analyticsEvents.length, afterRefusal);
+  assert.deepEqual(await consentPage.evaluate(() => Object.keys(localStorage)), ['camy-statistics-consent-v1']);
+  assert.deepEqual(await consentContext.cookies(), []);
+  // Changing the choice in another tab affects the open page as well.
+  const consentOther = await consentContext.newPage(); await consentOther.goto(origin + base + 'privacidade/');
+  await consentOther.getByRole('button', { name: 'Preferências de privacidade', exact: true }).click();
+  await consentOther.getByRole('dialog').getByRole('button', { name: 'Aceitar estatísticas', exact: true }).click();
+  await consentPage.waitForFunction(() => localStorage.getItem('camy-statistics-consent-v1') === 'accepted');
+  await consentPage.getByRole('button', { name: 'Preferências de privacidade', exact: true }).click();
+  await consentPage.getByText('Sua escolha atual: estatísticas permitidas.', { exact: false }).waitFor();
+  await consentPage.getByRole('dialog').getByRole('button', { name: 'Recusar', exact: true }).click();
+  await consentOther.waitForFunction(() => document.querySelector('[data-privacy-current]').textContent.includes('recusadas'));
+  await consentContext.close();
+  const blockedStorage = await browser.newContext({ viewport: { width: 320, height: 844 } });
+  await blockedStorage.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } }));
+  await blockedStorage.route(api + '/**', fixture);
+  const blockedPage = await blockedStorage.newPage(); blockedPage.on('pageerror', error => errors.push(error.message));
+  await blockedPage.goto(origin + base + 'contato/');
+  await blockedPage.getByRole('button', { name: 'Recusar', exact: true }).click();
+  assert.equal(await blockedPage.locator('.privacy-banner').isVisible(), false);
+  await blockedPage.getByRole('link', { name: 'Sobre', exact: true }).click();
+  await blockedPage.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+  await blockedStorage.close();
 
   // A production HTTP origin must not expose a login form or restore a session.
   const insecure = await browser.newContext();

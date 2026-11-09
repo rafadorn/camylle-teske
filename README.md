@@ -86,6 +86,50 @@ Referência para os valores DNS: [documentação oficial do GitHub Pages](https:
 
 ## Uso da Camy
 
+### Estatísticas e preferências de privacidade
+
+O site pede autorização antes de enviar estatísticas. **Aceitar estatísticas** e
+**Recusar** têm o mesmo destaque; o rodapé permite mudar a escolha depois. A
+preferência é salva em `localStorage` como `accepted` ou `refused`, sem criar ID
+de visitante nem cookie de rastreamento. Sem autorização, não há requisição ao
+coletor. Login e a área `/admin/` ficam fora da contagem.
+
+No painel, abrir **Estatísticas de acesso** para consultar hoje, os últimos sete
+e trinta dias, páginas mais acessadas e totais por dia. São visualizações de
+páginas autorizadas, não pessoas únicas. Não há histórico anterior à ativação;
+visitantes que recusam não entram nos totais.
+
+O coletor `record-portfolio-view` valida origem, chave publicável, consentimento
+e caminho canônico. Não recebe parâmetros da URL, fragmentos, referrer, sessão
+de login ou identificador de visitante no payload. Nunca encaminha IP ou
+User-Agent ao banco. A Edge Function recebe as credenciais de servidor somente
+pelas variáveis automáticas do Supabase; nenhuma chave privilegiada vai ao site.
+Os provedores podem processar metadados técnicos de conexão fora deste relatório,
+conforme descrito na página `/privacidade/`.
+
+As tabelas `private.portfolio_daily_views` e `private.portfolio_analytics_budget`
+guardam, respectivamente, totais por dia/página (relatórios de até 365 dias) e um limite global
+por minuto (janela de dois minutos, limpa na próxima coleta). Não há tabela de visitas individuais. A limpeza das contagens antigas ocorre
+a cada nova coleta; não há um agendamento de limpeza.
+RLS e permissões impedem leitura pública, escrita direta do visitante e leitura
+por contas fora da lista de administradores. A gravação é `SECURITY INVOKER`,
+executável apenas por `service_role`, e valida novamente as páginas publicadas.
+
+Para uma instalação nova, executar primeiro `supabase/schema.sql`, depois a
+migração `privacy_analytics` em `supabase/migrations/`, e publicar a função em
+`supabase/functions/record-portfolio-view`. Ela usa `verify_jwt = false` porque
+verifica a chave publicável no próprio código, compatível com `sb_publishable_`.
+Não há mudança de plano ou novo agendamento. Os limites normais do Supabase
+continuam aplicáveis.
+
+O pipeline de publicação executa `scripts/check-analytics.mjs`: `HEAD` verifica
+coletor e RPC sem criar um acesso; requisições sem consentimento e chamadas
+anônimas às funções privilegiadas precisam ser rejeitadas. Esse teste não deve
+ser usado como contagem de visita nem como substituto da checagem de saúde dos
+trabalhos publicados.
+
+### Publicar e editar trabalhos
+
 1. Acessar `https://DOMINIO/admin/` e entrar.
 2. Clicar **Novo trabalho**.
 3. Preencher título, categoria e descrição. O endereço é gerado pelo título.

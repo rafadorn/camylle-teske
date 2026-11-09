@@ -1,0 +1,19 @@
+.privacy-banner{position:fixed;z-index:40;left:1.25rem;bottom:1.25rem;width:30rem;max-width:calc(100% - 2.5rem);padding:1.4rem;background:#fff;color:#111;border:1px solid #bdbdbd;box-shadow:0 5px 30px #0001}
+.privacy-banner h2,.privacy-dialog h2{font-size:1.3rem;font-weight:500;line-height:1.2;margin:0 0 .8rem}
+.privacy-banner p,.privacy-dialog p{font-size:.875rem;line-height:1.55;margin:0 0 1rem}
+.privacy-actions{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:1rem}
+.privacy-actions button{font:inherit;font-size:.8rem;font-weight:500;padding:.8rem .5rem;min-height:46px;border:1px solid #111;background:#fff;color:#111;cursor:pointer;border-radius:0}
+.privacy-actions button:hover{background:#eee}
+.privacy-actions button:focus-visible,.privacy-close:focus-visible,.privacy-info:focus-visible,.privacy-preferences:focus-visible{outline:2px solid #111;outline-offset:4px}
+.privacy-info{display:inline-flex;align-items:center;min-height:44px;font-size:.75rem;text-decoration:underline;text-underline-offset:3px}
+.privacy-dialog{border:1px solid #111;padding:2rem;max-width:33rem;width:calc(100% - 2.5rem);max-height:calc(100svh - 3rem);overflow:auto;background:#fff;color:#111}
+.privacy-dialog::backdrop{background:#0006}
+.privacy-dialog h2{padding-right:1.4rem}
+.privacy-close{position:absolute;top:.4rem;right:.5rem;width:44px;height:44px;border:0;background:none;font:inherit;font-size:1.7rem;cursor:pointer}
+.privacy-preferences{font:inherit;font-size:.75rem;color:inherit;background:none;border:0;min-height:44px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:0}
+.privacy-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+.privacy-policy{max-width:740px;margin:2rem auto 5rem;font-size:1rem;line-height:1.65}
+.privacy-policy h1{font-size:clamp(2rem,5vw,3.5rem);line-height:1.1;margin-bottom:2rem}
+.privacy-policy h2{font-size:1.25rem;margin:2rem 0 .6rem;font-weight:500}
+.privacy-policy p{margin-bottom:1rem}
+@media(max-width:600px){.privacy-banner{left:1rem;bottom:max(1rem,env(safe-area-inset-bottom));max-width:calc(100% - 2rem);padding:1.1rem}.privacy-dialog{padding:1.4rem}.privacy-actions{gap:.6rem}.privacy-actions button{font-size:.75rem}.privacy-banner h2{font-size:1.2rem}}

@@ -1,3 +1,5 @@
+import './privacy.css';
+import { createPrivacy } from './privacy.js';
 import './styles.css';
 import initialProjects from './initial-projects.json';
 import { configured, listProjects } from './backend.js';
@@ -6,6 +8,10 @@ import { works, detail } from './render.js';
 const main = document.querySelector('main');
 const page = main.dataset.page;
 const base = import.meta.env.BASE_URL;
+const privacy = createPrivacy({ base, endpoint: configured ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/record-portfolio-view' : '', publicKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '' });
+if (page === 'about') privacy?.page('/sobre/');
+if (page === 'contact') privacy?.page('/contato/');
+if (page === 'privacy') privacy?.page('/privacidade/');
 
 async function load() {
   if (!['work', 'project'].includes(page)) return;
@@ -13,7 +19,7 @@ async function load() {
   if (configured) main.innerHTML = '<p class="page-message" role="status">Carregando trabalhos…</p>';
   try {
     const projects = configured ? await listProjects() : initialProjects;
-    if (page === 'work') { main.innerHTML = works(projects, base); return; }
+    if (page === 'work') { main.innerHTML = works(projects, base); privacy?.page('/'); return; }
     const slug = main.dataset.slug || new URLSearchParams(location.search).get('trabalho');
     const project = projects.find(p => p.slug === slug);
     if (!project) {
@@ -24,6 +30,7 @@ async function load() {
     document.title = `${project.title} — Camylle Teske`;
     document.querySelector('meta[name="description"]').content = project.description;
     main.innerHTML = detail(project, projects, base);
+    privacy?.page('/projetos/' + project.slug + '/');
   } catch {
     main.innerHTML = '<div class="page-message" role="alert"><p>Não foi possível carregar os trabalhos agora.</p><button type="button" class="retry">Tentar novamente</button></div>';
     main.querySelector('button').addEventListener('click', load);
