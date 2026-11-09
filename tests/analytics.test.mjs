@@ -4,7 +4,7 @@ import { analyticsPath, analyticsURL, brazilDay, summarizeViews } from '../src/a
 import { createHandler, publicKeys, backendKey } from '../supabase/functions/record-portfolio-view/handler.mjs';
 
 test('only canonical public paths enter statistics; no queries, identities or admin pages', () => {
-  for (const path of ['/', '/sobre/', '/contato/', '/privacidade/', '/projetos/projeto-publico/']) assert.equal(analyticsPath(path), path);
+  for (const path of ['/', '/projetos/', '/sobre/', '/contato/', '/privacidade/', '/projetos/projeto-publico/']) assert.equal(analyticsPath(path), path);
   for (const path of ['/admin/', '/projeto/?trabalho=abc', '/sobre/?email=private', '/#token', 'https://evil.test', '/projetos/../admin/', '/projetos/ABC/', null]) assert.equal(analyticsPath(path), null);
 });
 test('days and totals use Brazil time and page views rather than unique people', () => {
@@ -18,6 +18,7 @@ test('report links open dynamically published projects, including on a project P
   assert.equal(analyticsURL('/projetos/new-work/', '/'), '/projeto/?trabalho=new-work');
   assert.equal(analyticsURL('/projetos/new-work/', '/camylle-teske/'), '/camylle-teske/projeto/?trabalho=new-work');
   assert.equal(analyticsURL('/sobre/', '/'), '/sobre/');
+  assert.equal(analyticsURL('/projetos/', '/camylle-teske/'), '/camylle-teske/projetos/');
   assert.equal(analyticsURL('https://evil.test/', '/'), '/');
 });
 const projectURL = 'https://fixture.supabase.co';
@@ -27,6 +28,7 @@ function request(body, { origin = 'https://camylle-teske.com.br', key = 'test-pu
 test('collector sends only the canonical path to its privileged RPC and never forwards visitor headers', async () => {
   let call;
   const handler = createHandler({ projectURL, keys: ['test-public'], serviceKey: 'sb_secret_server_test', fetcher: async (url, options) => { call = { url, options }; return Response.json(true); } });
+  assert.equal((await handler(request({ path: '/projetos/', consent: 'statistics-v1' }))).status, 204);
   const response = await handler(request({ path: '/sobre/', consent: 'statistics-v1' }));
   assert.equal(response.status, 204); assert.equal(await response.text(), '');
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://camylle-teske.com.br');

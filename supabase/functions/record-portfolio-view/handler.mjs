@@ -1,6 +1,6 @@
 const ORIGINS = new Set(['https://camylle-teske.com.br', 'https://www.camylle-teske.com.br', 'https://rafadorn.github.io']);
 const validPath = path => typeof path === 'string' && path.length <= 180 && (
-  ['/', '/sobre/', '/contato/', '/privacidade/'].includes(path) || /^\/projetos\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(path));
+  ['/', '/projetos/', '/sobre/', '/contato/', '/privacidade/'].includes(path) || /^\/projetos\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(path));
 
 async function readPayload(request) {
   if (!request.body || Number(request.headers.get('content-length')) > 512) throw new Error('payload');

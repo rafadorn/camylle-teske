@@ -1,5 +1,5 @@
 import { mountAnalytics } from './admin-analytics.js';
-import './styles.css';
+import './admin-base.css';
 import './admin.css';
 import { client, configured, secureConnection, listProjects, saveProject, uploadImage, removeImages, deleteProject, reorderProjects, friendlyError } from './backend.js';
 import { slugify, validateImage, validateProject, escapeHTML as e } from './project.js';

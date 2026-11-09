@@ -26,6 +26,7 @@ await db.exec(`
   grant select on public.projects to service_role;
 `);
 await db.exec(await readFile(new URL('../supabase/migrations/20261109120754_privacy_analytics.sql', import.meta.url), 'utf8'));
+await db.exec(await readFile(new URL('../supabase/migrations/20261109140225_approved_portfolio_projects_page.sql', import.meta.url), 'utf8'));
 async function as(role, user, fn) {
   await db.exec(`set role ${role}; select set_config('request.jwt.claim.sub','${user || ''}',false);`);
   try { return await fn(); } finally { await db.exec('reset role'); }
@@ -41,7 +42,7 @@ test('only the collector role can increment totals, and it can never store arbit
     await assert.rejects(db.exec('select * from public.portfolio_analytics(30)'));
   });
   await as('service_role', null, async () => {
-    for (const path of ['/', '/', '/sobre/', '/projetos/published/']) assert.equal((await db.query('select public.record_portfolio_page_view($1) as ok', [path])).rows[0].ok, true);
+    for (const path of ['/', '/', '/projetos/', '/sobre/', '/projetos/published/']) assert.equal((await db.query('select public.record_portfolio_page_view($1) as ok', [path])).rows[0].ok, true);
     for (const path of ['/admin/', '/projetos/draft/', '/projetos/unknown/', '/?email=private', 'https://evil.test']) await assert.rejects(db.query('select public.record_portfolio_page_view($1)', [path]));
   });
 });
@@ -49,7 +50,7 @@ test('aggregate reads are private to the admin allowlist, with no visitor fields
   await as('authenticated', outsider, async () => assert.equal((await db.query('select * from private.portfolio_daily_views')).rows.length, 0));
   await as('authenticated', admin, async () => {
     const rows = (await db.query('select * from public.portfolio_analytics(30)')).rows;
-    assert.equal(rows.length, 3); assert.equal(rows.reduce((n, r) => n + Number(r.views), 0), 4);
+    assert.equal(rows.length, 4); assert.equal(rows.reduce((n, r) => n + Number(r.views), 0), 5);
     assert.deepEqual(Object.keys(rows[0]), ['view_day', 'page_path', 'views']);
     await assert.rejects(db.exec("insert into private.portfolio_daily_views values(current_date,'/',99)"));
     await assert.rejects(db.exec('select * from public.portfolio_analytics(366)'));
@@ -61,7 +62,7 @@ test('the collector caps global activity and expires old aggregate and budget ro
   await db.exec("delete from private.portfolio_analytics_budget; insert into private.portfolio_analytics_budget values(now()-interval '1 day',1); insert into private.portfolio_daily_views values((now() at time zone 'America/Sao_Paulo')::date-365,'/sobre/',1)");
   await as('service_role', null, async () => assert.equal((await db.query("select public.record_portfolio_page_view('/contato/') as ok")).rows[0].ok, true));
   assert.equal((await db.query('select count(*)::int as n from private.portfolio_analytics_budget')).rows[0].n, 1);
-  assert.equal((await db.query('select count(*)::int as n from private.portfolio_daily_views')).rows[0].n, 4);
+  assert.equal((await db.query('select count(*)::int as n from private.portfolio_daily_views')).rows[0].n, 5);
 });
 test('readiness probe creates neither views nor budget activity', async () => {
   const before = await db.query('select sum(views)::text as n from private.portfolio_daily_views');

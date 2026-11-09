@@ -145,7 +145,7 @@ try {
   await page.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   assert.equal(await page.locator('.work-row').count(), 7);
   const publicPage = await context.newPage(); publicPage.on('pageerror', error => errors.push(error.message));
-  await publicPage.goto(origin + base);
+  await publicPage.goto(origin + base + 'projetos/');
   await publicPage.locator('.project').first().waitFor();
   assert.equal(await publicPage.locator('.project').count(), 6, 'draft not shown to visitors');
   await page.locator('.work-row').filter({ hasText: 'Novo projeto de teste' }).getByRole('button', { name: 'Editar', exact: true }).click();
@@ -162,7 +162,7 @@ try {
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   // A atualização pública não reapresenta o conteúdo estático em uma falha do banco.
   await publicPage.route(api + '/rest/v1/projects**', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'offline' }) }));
-  await publicPage.goto(origin + base);
+  await publicPage.goto(origin + base + 'projetos/');
   await publicPage.getByText('Não foi possível carregar os trabalhos agora.').waitFor();
   assert.equal(await publicPage.locator('.project').count(), 0);
   await publicPage.unroute(api + '/rest/v1/projects**');
@@ -252,6 +252,50 @@ try {
   assert.equal(recoveryPage.url(), origin + base + 'admin/');
   await recoveryContext.close();
 
+  // The public cover uses the approved font; project counts do not limit the grid.
+  const visual = await context.newPage();
+  visual.on('pageerror', error => errors.push(error.message));
+  await visual.goto(origin + base);
+  await visual.evaluate(() => document.fonts.ready);
+  const cdp = await context.newCDPSession(visual);
+  await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+  const { root: docRoot } = await cdp.send('DOM.getDocument');
+  const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: docRoot.nodeId, selector: '.wordmark' });
+  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+  assert.ok(fonts.some(font => font.isCustomFont && /Bogue/i.test(font.postScriptName)), 'cover renders the actual Bogue glyphs');
+  await cdp.detach();
+  if (await visual.locator('.privacy-banner').isVisible()) await visual.getByRole('button', { name: 'Recusar', exact: true }).click();
+  await visual.screenshot({ path: 'test-results/cover-desktop.png', fullPage: true });
+  const originalProjects = structuredClone(projects);
+  try {
+    for (const count of [0, 1, 4, 5, 7, 12, 13]) {
+      projects = Array.from({ length: count }, (_, index) => ({ ...seed[index % seed.length], id: String(index), slug: `fixture-${index}` }));
+      await visual.goto(origin + base + 'projetos/');
+      if (count) await visual.locator('.project').first().waitFor();
+      else await visual.getByText('Novos trabalhos chegam em breve.').waitFor();
+      assert.equal(await visual.locator('.project').count(), count);
+      assert.equal(await visual.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `grid overflow for ${count} projects`);
+      const boxes = await visual.locator('.project').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, height: rect.height }; }));
+      for (let i = 0; i < boxes.length; i++) {
+        assert.ok(boxes[i].height > 100, `project ${i} has a usable cover at count ${count}`);
+        for (let j = 0; j < i; j++) assert.ok(boxes[i].right <= boxes[j].x || boxes[j].right <= boxes[i].x || boxes[i].bottom <= boxes[j].y || boxes[j].bottom <= boxes[i].y, 'project cards never overlap');
+      }
+    }
+  } finally { projects = originalProjects; }
+  await visual.goto(origin + base + 'projetos/');
+  await visual.locator('.project').first().waitFor();
+  const firstCard = visual.locator('.project').first();
+  await firstCard.locator('img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
+  await visual.mouse.move(0, 0);
+  const staticCover = await firstCard.screenshot();
+  await firstCard.hover();
+  assert.deepEqual(await firstCard.screenshot(), staticCover, 'covers and captions remain pixel-identical on hover');
+  await visual.emulateMedia({ reducedMotion: 'reduce' });
+  const menuLink = visual.getByRole('link', { name: 'Sobre', exact: true });
+  await menuLink.focus();
+  assert.equal(await visual.locator('.nav-highlight').evaluate(node => getComputedStyle(node).transitionDuration), '0s');
+  await visual.close();
+
   // Exercise public navigation and touch layouts at narrow phone widths.
   const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await touch.route(api + '/**', fixture);
@@ -260,24 +304,30 @@ try {
   for (const width of [320, 390, 430]) {
     await mobile.setViewportSize({ width, height: 844 });
     await mobile.goto(origin + base);
+    await mobile.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+    assert.equal(await mobile.locator('.project').count(), 0, 'cover is separate from the projects');
+    assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `cover overflow ${width}`);
+    if (await mobile.locator('.privacy-banner').isVisible()) await mobile.getByRole('button', { name: 'Recusar', exact: true }).click();
+    if (width === 390) await mobile.screenshot({ path: 'test-results/cover-mobile.png', fullPage: true });
+    await mobile.getByRole('link', { name: 'Projetos', exact: true }).click();
     await mobile.locator('.project').first().waitFor();
     if (await mobile.locator('.privacy-banner').isVisible()) await mobile.getByRole('button', { name: 'Recusar', exact: true }).click();
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow ${width}`);
-    assert.equal(await mobile.locator('.project-caption').first().evaluate(node => getComputedStyle(node).opacity), '0', 'touch cards have no green overlay');
+    assert.equal(await mobile.locator('.project-caption').first().evaluate(node => getComputedStyle(node).opacity), '1', 'touch cards keep captions visible');
     for (const nav of await mobile.locator('nav a').all()) assert.ok((await nav.boundingBox()).height >= 44, 'menu touch target');
     await mobile.getByRole('link', { name: 'Sobre', exact: true }).click();
-    await mobile.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+    await mobile.getByRole('heading', { name: 'Sobre Mim', exact: true }).waitFor();
     assert.equal(await mobile.locator('nav a[aria-current="page"]').textContent(), 'Sobre');
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     if (width === 390) await mobile.screenshot({ path: 'test-results/about-mobile.png', fullPage: true });
     await mobile.getByRole('link', { name: 'Contato', exact: true }).click();
     await mobile.getByRole('heading', { name: 'Vamos conversar?', exact: true }).waitFor();
-    assert.equal(await mobile.locator('.contact-email').getAttribute('href'), 'mailto:teske.camy@gmail.com');
-    assert.equal(await mobile.locator('a[href="https://www.instagram.com/camyteske/"]').count(), 1);
+    assert.equal(await mobile.locator('.email-link').getAttribute('href'), 'mailto:teske.camy@gmail.com');
+    assert.equal(await mobile.locator('.contact-socials a[href="https://www.instagram.com/camyteske/"]').count(), 1);
     assert.equal(await mobile.locator('a[href="https://www.linkedin.com/in/camylle-teske-62a539330/"]').count(), 1);
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     if (width === 390) await mobile.screenshot({ path: 'test-results/contact-mobile.png', fullPage: true });
-    await mobile.getByRole('link', { name: 'Trabalhos', exact: true }).click();
+    await mobile.getByRole('link', { name: 'Projetos', exact: true }).click();
     await mobile.locator('.project').first().waitFor();
     if (await mobile.locator('.privacy-banner').isVisible()) await mobile.getByRole('button', { name: 'Recusar', exact: true }).click();
     if (width === 390) await mobile.screenshot({ path: 'test-results/portfolio-mobile.png', fullPage: true });
@@ -307,7 +357,7 @@ try {
   assert.deepEqual(analyticsEvents.at(-1).body, { path: '/sobre/', consent: 'statistics-v1' });
   for (const header of ['authorization', 'cookie', 'referer']) assert.equal(analyticsEvents.at(-1).headers[header], undefined);
   await consentPage.reload();
-  await consentPage.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+  await consentPage.getByRole('heading', { name: 'Sobre Mim', exact: true }).waitFor();
   for (let i = 0; analyticsEvents.length < beforeConsent + 2 && i < 50; i++) await consentPage.waitForTimeout(50);
   assert.equal(analyticsEvents.length, beforeConsent + 2);
   assert.equal(await banner.isVisible(), false);
@@ -342,7 +392,7 @@ try {
   await blockedPage.getByRole('button', { name: 'Recusar', exact: true }).click();
   assert.equal(await blockedPage.locator('.privacy-banner').isVisible(), false);
   await blockedPage.getByRole('link', { name: 'Sobre', exact: true }).click();
-  await blockedPage.getByRole('heading', { name: 'Camylle Teske', exact: true }).waitFor();
+  await blockedPage.getByRole('heading', { name: 'Sobre Mim', exact: true }).waitFor();
   await blockedStorage.close();
 
   // A production HTTP origin must not expose a login form or restore a session.

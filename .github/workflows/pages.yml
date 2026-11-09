@@ -59,3 +59,10 @@ jobs:
     steps:
       - uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         id: deployment
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Conferir páginas públicas sem registrar visitas
+        run: node scripts/check-public-site.mjs
+        env:
+          PORTFOLIO_URL: ${{ steps.deployment.outputs.page_url }}

@@ -1,13 +1,13 @@
 // Only these public page labels may enter the statistics request.
 export function analyticsPath(value) {
   if (typeof value !== 'string' || value.length > 180) return null;
-  if (['/', '/sobre/', '/contato/', '/privacidade/'].includes(value)) return value;
+  if (['/', '/projetos/', '/sobre/', '/contato/', '/privacidade/'].includes(value)) return value;
   return /^\/projetos\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(value) ? value : null;
 }
 
 export function analyticsURL(path, base) {
   if (!analyticsPath(path)) return base;
-  return path.startsWith('/projetos/')
+  return path !== '/projetos/' && path.startsWith('/projetos/')
     ? `${base}projeto/?trabalho=${encodeURIComponent(path.slice('/projetos/'.length, -1))}`
     : base + path.slice(1);
 }

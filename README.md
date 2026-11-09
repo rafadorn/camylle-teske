@@ -1,6 +1,6 @@
 # Camylle Teske — portfólio e painel
 
-Site branco com texto preto, DM Sans e efeito de hover verde `#AEB400`. Preserva os seis projetos, as imagens originais, a foto, os textos e a composição do portfólio aprovado.
+Layout aprovado: capa com Camylle Teske em Bogue-Light, Sobre e Projetos em páginas separadas, grade assimétrica e capas estáticas. Apenas o fundo do menu acompanha o mouse e o foco do teclado. Os trabalhos continuam sendo publicados pelo painel, sem recompilar o site. As fontes e imagens são servidas pelo próprio site; DM Sans cobre os caracteres ausentes dos subconjuntos do PDF.
 
 O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel `/admin/`. O Supabase guarda login, projetos e novas imagens. A Camy publica pelo painel, sem acessar GitHub, Wix ou arquivos de código.
 
@@ -85,6 +85,10 @@ Com o domínio raiz configurado, o GitHub pode redirecionar `www` para o endere�
 Referência para os valores DNS: [documentação oficial do GitHub Pages](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site).
 
 ## Uso da Camy
+
+### Disposição aprovada
+
+A capa fica em `/`, o catálogo em `/projetos/`, o Sobre em `/sobre/` e o Contato em `/contato/`. Os links antigos de trabalhos e a rota dinâmica `/projeto/?trabalho=...` continuam disponíveis. A composição se repete a cada seis projetos e se adapta a grupos menores, rascunhos e novas publicações. O painel mantém seu visual e seus controles anteriores.
 
 ### Estatísticas e preferências de privacidade
 

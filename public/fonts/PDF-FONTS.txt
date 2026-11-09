@@ -1,0 +1,4 @@
+Font subsets from the site.pdf supplied by Camylle Teske, matching the approved HTML.
+Bogue-Light: fixed display lettering; FFF Acid Grotesk Light: available PDF characters.
+DM Sans is the fallback for characters not embedded in the PDF.
+These subsets do not constitute the complete font families.

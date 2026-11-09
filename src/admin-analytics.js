@@ -2,7 +2,7 @@ import { escapeHTML as e } from './project.js';
 import { summarizeViews, analyticsURL } from './analytics-path.js';
 
 const number = value => new Intl.NumberFormat('pt-BR').format(value);
-const pageLabel = path => ({ '/': 'Trabalhos', '/sobre/': 'Sobre', '/contato/': 'Contato', '/privacidade/': 'Privacidade' }[path] || path);
+const pageLabel = path => ({ '/': 'Início', '/projetos/': 'Projetos', '/sobre/': 'Sobre', '/contato/': 'Contato', '/privacidade/': 'Privacidade' }[path] || path);
 const dateLabel = day => day.slice(8) + '/' + day.slice(5, 7);
 
 export function mountAnalytics(before, { client, auth, expired, friendlyError, base }) {
