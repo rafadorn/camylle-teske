@@ -1,7 +1,11 @@
 import { mountAnalytics } from './admin-analytics.js';
 import './admin-base.css';
 import './admin.css';
-import { client, configured, secureConnection, listProjects, saveProject, uploadImage, removeImages, deleteProject, reorderProjects, friendlyError } from './backend.js';
+import './layout.css';
+import { mountCoverLayout, bindLayoutDrag } from './admin-layout.js';
+import { CARD_LAYOUTS, IMAGE_WIDTHS, IMAGE_ALIGNS, hasImageLayout, imageWidth, imageAlign } from './layout.js';
+import { projectGallery } from './render.js';
+import { client, configured, secureConnection, listProjects, saveProject, uploadImage, removeImages, deleteProject, reorderProjects, savePortfolioLayout, friendlyError } from './backend.js';
 import { slugify, validateImage, validateProject, escapeHTML as e } from './project.js';
 import { importInitial, initialImportState } from './import-initial.js';
 import { createAuthBoundary, httpsLocation, sessionExpired } from './security.js';
@@ -164,10 +168,46 @@ function leaveEditor() {
   return true;
 }
 
+function openCoverLayout() {
+  if (saving || !projects.length) return;
+  const ticket = auth.capture();
+  mountCoverLayout(root, {
+    projects, base, current: () => auth.current(ticket) && !saving,
+    changed: () => { dirty = true; },
+    cancel: () => { if (leaveEditor()) overview(); },
+    save: async draft => {
+      if (saving || !auth.current(ticket)) return;
+      saving = true; root.querySelectorAll('button,select').forEach(node => node.disabled = true);
+      message('Salvando o layout…');
+      let committed = false;
+      try {
+        await savePortfolioLayout(draft);
+        committed = true;
+        if (!auth.current(ticket)) return;
+        dirty = false;
+        const loaded = await listProjects(true);
+        if (!auth.current(ticket)) return;
+        projects = loaded; overview('Layout da grade salvo no portfólio.');
+      } catch (error) {
+        if (!auth.current(ticket) || expired(error)) return;
+        if (committed) {
+          root.innerHTML = '<section><h1>Layout salvo.</h1><p>Não foi possível atualizar a lista agora.</p><button type="button" class="secondary" id="reload-layout-list">Atualizar lista</button></section>';
+          root.querySelector('#reload-layout-list').addEventListener('click', enter);
+        } else {
+          root.querySelectorAll('button,select').forEach(node => node.disabled = false);
+          message(friendlyError(error), true);
+        }
+      } finally { if (auth.current(ticket)) saving = false; }
+    },
+  });
+  window.scrollTo(0, 0);
+}
+
 function overview(notice = '') {
-  root.innerHTML = `<section><div class="panel-heading"><div><p class="eyebrow">Seu portfólio</p><h1>Trabalhos</h1><p class="muted">${projects.filter(p => p.status === 'published').length} publicados · ${projects.filter(p => p.status === 'draft').length} rascunhos</p></div><div class="heading-actions"><button class="plain" id="logout" type="button">Sair</button><button class="primary" id="new" type="button">Novo trabalho</button></div></div><p data-message aria-live="polite">${e(notice)}</p><div class="work-list">${projects.map((p, i) => `<article class="work-row"><div class="row-image">${p.media.length ? `<img src="${e((p.media.find(m => m.path === p.cover_path) || p.media[0]).url)}" alt="">` : '<span>Sem capa</span>'}</div><div class="row-info"><h2>${e(p.title)}</h2><p>${e(p.category || 'Categoria a preencher')}</p><span class="status-pill${p.status === 'draft' ? ' draft' : ''}">${p.status === 'published' ? 'Publicado' : 'Rascunho'}</span></div><div class="row-actions"><div class="order-actions"><button type="button" data-move="${i}" data-direction="-1" aria-label="Subir ${e(p.title)}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-move="${i}" data-direction="1" aria-label="Descer ${e(p.title)}" ${i === projects.length - 1 ? 'disabled' : ''}>Descer</button></div><button class="secondary" type="button" data-edit="${p.id}">Editar</button></div></article>`).join('') || '<div class="empty-state"><h2>Seu próximo trabalho começa aqui.</h2><p>Adicione as imagens e conte um pouco sobre o projeto.</p></div>'}</div></section>`;
+  root.innerHTML = `<section><div class="panel-heading"><div><p class="eyebrow">Seu portfólio</p><h1>Trabalhos</h1><p class="muted">${projects.filter(p => p.status === 'published').length} publicados · ${projects.filter(p => p.status === 'draft').length} rascunhos</p></div><div class="heading-actions"><button class="plain" id="logout" type="button">Sair</button><button class="secondary" id="layout" type="button">Montar layout da grade</button><button class="primary" id="new" type="button">Novo trabalho</button></div></div><p data-message aria-live="polite">${e(notice)}</p><div class="work-list">${projects.map((p, i) => `<article class="work-row"><div class="row-image">${p.media.length ? `<img src="${e((p.media.find(m => m.path === p.cover_path) || p.media[0]).url)}" alt="">` : '<span>Sem capa</span>'}</div><div class="row-info"><h2>${e(p.title)}</h2><p>${e(p.category || 'Categoria a preencher')}</p><span class="status-pill${p.status === 'draft' ? ' draft' : ''}">${p.status === 'published' ? 'Publicado' : 'Rascunho'}</span></div><div class="row-actions"><div class="order-actions"><button type="button" data-move="${i}" data-direction="-1" aria-label="Subir ${e(p.title)}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-move="${i}" data-direction="1" aria-label="Descer ${e(p.title)}" ${i === projects.length - 1 ? 'disabled' : ''}>Descer</button></div><button class="secondary" type="button" data-edit="${p.id}">Editar</button></div></article>`).join('') || '<div class="empty-state"><h2>Seu próximo trabalho começa aqui.</h2><p>Adicione as imagens e conte um pouco sobre o projeto.</p></div>'}</div></section>`;
   root.querySelector('#logout').addEventListener('click', signOut);
   root.querySelector('#new').addEventListener('click', () => openEditor());
+  root.querySelector('#layout').addEventListener('click', openCoverLayout);
   mountAnalytics(root.querySelector('.work-list'), { client, auth, expired, friendlyError, base });
   root.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openEditor(projects.find(p => p.id === button.dataset.edit))));
   root.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', async () => {
@@ -179,7 +219,9 @@ function overview(notice = '') {
     try {
       await reorderProjects(reordered.map(p => p.id));
       if (!auth.current(ticket)) return;
-      projects = reordered.map((p, i) => ({ ...p, position: i + 1 })); overview('Ordem atualizada no portfólio.');
+      const loaded = await listProjects(true);
+      if (!auth.current(ticket)) return;
+      projects = loaded; overview('Ordem atualizada no portfólio.');
     } catch (error) {
       if (auth.current(ticket) && !expired(error)) { overview(); message(friendlyError(error), true); }
     } finally { if (auth.current(ticket)) saving = false; }
@@ -222,7 +264,7 @@ function openEditor(project) {
   };
   editor.isNew = !project; editor.originalPaths = project?.media.map(m => m.path) || [];
   dirty = false;
-  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div><form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
+  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div><form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
   root.querySelector('#back').addEventListener('click', () => { if (leaveEditor()) overview(); });
   const form = root.querySelector('form');
   let customSlug = false;
@@ -250,7 +292,7 @@ function openEditor(project) {
         } catch (error) { URL.revokeObjectURL(blob); throw error; }
         if (!current()) { URL.revokeObjectURL(blob); return; }
         const path = `pending/${crypto.randomUUID()}`;
-        editing.media.push({ path, alt: '', file, blob, url: blob });
+        editing.media.push({ path, alt: '', file, blob, url: blob, ...(hasImageLayout(editing) ? { width: 'full', align: 'auto' } : {}) });
         if (!editing.cover_path) editing.cover_path = path;
         dirty = true;
       }
@@ -293,18 +335,21 @@ function openEditor(project) {
       }
     } finally { if (current()) saving = false; }
   });
+  root.querySelector('#image-preview-device').addEventListener('change', event => root.querySelector('.media-preview').classList.toggle('preview-phone', event.target.value === 'phone'));
+  root.querySelector('#reset-image-layout').addEventListener('click', () => { if (saving || !editor) return; editor.media.forEach(media => { delete media.width; delete media.align; }); dirty = true; renderMedia(); });
+  form.cover_layout.addEventListener('change', renderImagePreview);
+  bindLayoutDrag(root.querySelector('#media-list'), () => editor?.media.map(media => media.path) || [], moveImage, () => Boolean(editor && !saving && !processingImages));
   renderMedia(); window.scrollTo(0, 0);
 }
 
 function renderMedia() {
   root.querySelector('[data-count]').textContent = `${editor.media.length} / 40`;
-  root.querySelector('#media-list').innerHTML = editor.media.map((m, i) => `<article class="media-item"><img src="${e(m.url)}" alt="${e(m.alt)}"><div><div class="media-heading"><span>Imagem ${i + 1}</span><button type="button" class="cover-button${m.path === editor.cover_path ? ' selected' : ''}" data-cover="${i}" aria-pressed="${m.path === editor.cover_path}">${m.path === editor.cover_path ? 'Capa escolhida' : 'Usar como capa'}</button></div><label>Descrição da imagem<input data-alt="${i}" value="${e(m.alt)}" maxlength="600" placeholder="Descreva a imagem para acessibilidade"></label><div class="media-actions"><button type="button" data-reorder="${i}" data-direction="-1" aria-label="Subir imagem ${i + 1}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-reorder="${i}" data-direction="1" aria-label="Descer imagem ${i + 1}" ${i === editor.media.length - 1 ? 'disabled' : ''}>Descer</button><button type="button" class="plain" data-remove="${i}">Remover</button></div></div></article>`).join('') || '<p class="empty-media">As imagens que você escolher aparecem aqui.</p>';
+  root.querySelector('#media-list').innerHTML = editor.media.map((m, i) => `<article class="media-item" data-layout-id="${e(m.path)}" draggable="true"><img src="${e(m.url)}" alt="${e(m.alt)}"><div><div class="media-heading"><span>Imagem ${i + 1}</span><button type="button" class="cover-button${m.path === editor.cover_path ? ' selected' : ''}" data-cover="${i}" aria-pressed="${m.path === editor.cover_path}">${m.path === editor.cover_path ? 'Capa escolhida' : 'Usar como capa'}</button></div><label>Descrição da imagem<input data-alt="${i}" value="${e(m.alt)}" maxlength="600" placeholder="Descreva a imagem para acessibilidade"></label><div class="media-placement"><label>Largura da imagem ${i + 1}<select data-image-width="${i}" aria-label="Largura da imagem ${i + 1}">${Object.entries(IMAGE_WIDTHS).map(([value,label]) => `<option value="${value}"${imageWidth(m) === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Alinhamento da imagem ${i + 1}<select data-image-align="${i}" aria-label="Alinhamento da imagem ${i + 1}">${Object.entries(IMAGE_ALIGNS).map(([value,label]) => `<option value="${value}"${imageAlign(m) === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label></div><div class="media-actions"><button type="button" data-reorder="${i}" data-direction="-1" aria-label="Subir imagem ${i + 1}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-reorder="${i}" data-direction="1" aria-label="Descer imagem ${i + 1}" ${i === editor.media.length - 1 ? 'disabled' : ''}>Descer</button><button type="button" class="plain" data-remove="${i}">Remover</button></div></div></article>`).join('') || '<p class="empty-media">As imagens que você escolher aparecem aqui.</p>';
   root.querySelectorAll('[data-alt]').forEach(input => input.addEventListener('input', () => { editor.media[Number(input.dataset.alt)].alt = input.value; dirty = true; }));
   root.querySelectorAll('[data-cover]').forEach(button => button.addEventListener('click', () => { editor.cover_path = editor.media[Number(button.dataset.cover)].path; dirty = true; renderMedia(); }));
   root.querySelectorAll('[data-reorder]').forEach(button => button.addEventListener('click', () => {
     const i = Number(button.dataset.reorder), j = i + Number(button.dataset.direction);
-    [editor.media[i], editor.media[j]] = [editor.media[j], editor.media[i]];
-    dirty = true; renderMedia();
+    moveImage(i, j);
   }));
   root.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => {
     const [removed] = editor.media.splice(Number(button.dataset.remove), 1);
@@ -312,6 +357,37 @@ function renderMedia() {
     if (removed.path === editor.cover_path) editor.cover_path = editor.media[0]?.path || null;
     dirty = true; renderMedia();
   }));
+
+  root.querySelectorAll('[data-image-width],[data-image-align]').forEach(select => select.addEventListener('change', () => {
+    if (saving || !editor) return;
+    enableImageLayout();
+    const index = Number(select.dataset.imageWidth ?? select.dataset.imageAlign);
+    editor.media[index][select.hasAttribute('data-image-width') ? 'width' : 'align'] = select.value;
+    dirty = true; renderMedia();
+    root.querySelector(`[data-image-${select.hasAttribute('data-image-width') ? 'width' : 'align'}="${index}"]`)?.focus({ preventScroll: true });
+  }));
+  renderImagePreview();
+}
+
+function enableImageLayout() {
+  if (hasImageLayout(editor)) return;
+  const triptych = root.querySelector('[name="cover_layout"]').value === 'triptych';
+  editor.media.forEach((media, i) => { media.width = triptych && i < 3 ? 'third' : 'full'; media.align = 'auto'; });
+}
+
+function moveImage(from, to) {
+  if (!editor || saving || from === to || to < 0 || to >= editor.media.length) return;
+  enableImageLayout();
+  const [media] = editor.media.splice(from, 1); editor.media.splice(to, 0, media);
+  dirty = true; renderMedia();
+  root.querySelector(`[data-alt="${to}"]`)?.focus({ preventScroll: true });
+}
+
+function renderImagePreview() {
+  const preview = root.querySelector('.media-preview');
+  if (!preview || !editor) return;
+  const project = { ...editor, cover_layout: root.querySelector('[name="cover_layout"]').value };
+  preview.innerHTML = project.media.length ? projectGallery(project, base) : '<p class="empty-media">Adicione imagens para ver a composição.</p>';
 }
 
 async function persist(status) {

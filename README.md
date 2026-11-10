@@ -132,6 +132,14 @@ anônimas às funções privilegiadas precisam ser rejeitadas. Esse teste não d
 ser usado como contagem de visita nem como substituto da checagem de saúde dos
 trabalhos publicados.
 
+### Montar o layout pelo painel
+
+Em **Trabalhos > Montar layout da grade**, arrastar as capas ou usar **Antes / Depois**, escolher pequena, larga, alta, destaque ou largura inteira e conferir a prévia de celular. **Salvar layout da grade** aplica ordem e tamanhos juntos; sair sem salvar descarta a montagem. Rascunhos ficam fora da prévia pública. **Usar tamanhos automáticos** recupera a composição aprovada sem mudar a ordem escolhida.
+
+Em **Editar trabalho > Imagens**, cada imagem tem largura inteira, metade ou um terço e alinhamento na sequência, à esquerda, ao centro ou à direita. A prévia aparece abaixo dos controles. Arrastar ou usar **Subir / Descer** muda a ordem da galeria; a escolha da capa é independente. **Salvar como rascunho** ou **Salvar e manter publicado** guarda essa montagem. A disposição automática existente é preservada até editar esses controles, e pode ser restaurada pelo botão da prévia. No celular, as imagens ficam em uma coluna para continuar legíveis.
+
+As escolhas são valores predefinidos, sem HTML, CSS ou scripts enviados pelo painel. A migração `visual_layout_editor` adiciona somente metadados de apresentação e uma gravação atômica sob as regras de administrador existentes. Uma aba antiga precisa atualizar antes de sobrescrever uma versão mais recente. As prévias de rascunhos usam a sessão do administrador, não ficam salvas no navegador e desaparecem ao sair.
+
 ### Publicar e editar trabalhos
 
 1. Acessar `https://DOMINIO/admin/` e entrar.

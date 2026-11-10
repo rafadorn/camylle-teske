@@ -11,6 +11,9 @@ const origin = 'http://127.0.0.1:4179';
 const api = 'https://camylle-test.supabase.co';
 const base = process.env.TEST_BASE_PATH || '/';
 const seed = JSON.parse(await readFile(new URL('../src/initial-projects.json', import.meta.url), 'utf8'));
+seed.forEach(project => { project.updated_at = '2026-11-10T12:00:00.000Z'; project.card_layout = 'auto'; });
+let fixtureVersion = 1;
+const nextVersion = () => new Date(Date.UTC(2026,10,10,12,0,0,fixtureVersion++)).toISOString();
 let projects = structuredClone(seed);
 const upload = await readFile(new URL('../public/images/vestis.png', import.meta.url));
 const requests = [];
@@ -68,14 +71,26 @@ try {
     if (url.pathname === '/rest/v1/rpc/portfolio_access') return json(allowAdmin);
     if (url.pathname === '/rest/v1/rpc/portfolio_analytics') return allowAdmin ? json([{ view_day: brazilDay(), page_path: '/', views: 3 }, { view_day: brazilDay(), page_path: '/sobre/', views: 2 }]) : json({ message: 'permission denied', code: '42501' }, 403);
     if (url.pathname === '/functions/v1/record-portfolio-view') { analyticsEvents.push({ body, headers: request.headers() }); return route.fulfill({ status: 204 }); }
-    if (url.pathname === '/rest/v1/rpc/reorder_projects') { projects = body.project_ids.map((id, i) => ({ ...projects.find(p => p.id === id), position: i + 1 })); return json(null); }
+    if (url.pathname === '/rest/v1/rpc/reorder_projects') { projects = body.project_ids.map((id, i) => ({ ...projects.find(p => p.id === id), position: i + 1, updated_at: nextVersion() })); return json(null); }
+    if (url.pathname === '/rest/v1/rpc/save_portfolio_layout') {
+      if (!allowAdmin) return json({message:'permission denied',code:'42501'},403);
+      if (body.project_ids.length !== projects.length || body.project_ids.some((id,index) => projects.find(project => project.id===id)?.updated_at !== body.expected_versions[index])) return json({message:'Portfolio changed',code:'40001'},409);
+      projects=body.project_ids.map((id,index) => ({...projects.find(project => project.id===id),position:index+1,card_layout:body.card_layouts[index],updated_at:nextVersion()}));
+      return json(null);
+    }
     if (url.pathname === '/rest/v1/projects') {
       if (request.method() === 'GET') return json(projects.filter(p => url.searchParams.get('status') !== 'eq.published' || p.status === 'published').sort((a, b) => a.position - b.position));
       if (request.method() === 'POST') {
-        const record = { ...body, created_at: '2026-10-08T12:00:00Z' };
+        const record = { ...body, created_at: '2026-10-08T12:00:00Z', updated_at: nextVersion() };
         const index = projects.findIndex(p => p.id === record.id);
         if (index < 0) projects.push(record); else projects[index] = record;
         return json(record, 201);
+      }
+      if (request.method() === 'PATCH') {
+        const id = url.searchParams.get('id')?.replace('eq.',''), version=url.searchParams.get('updated_at')?.replace('eq.','');
+        const index=projects.findIndex(project=>project.id===id && project.updated_at===version);
+        if(index<0) return json({message:'Changed since opening',code:'PGRST116'},406);
+        projects[index]={...projects[index],...body,updated_at:nextVersion()}; return json(projects[index]);
       }
       if (request.method() === 'DELETE') { projects = projects.filter(p => p.id !== url.searchParams.get('id')?.replace('eq.', '')); return json(null); }
     }
@@ -117,6 +132,47 @@ try {
   assert.equal(await page.locator('.analytics-report > .analytics-table tbody tr').count(), 2);
   await page.screenshot({ path: 'test-results/analytics-admin.png', fullPage: true });
   await page.getByText('Estatísticas de acesso', { exact: true }).click();
+  // Compose the public grid without writing until Save, using drag and accessible controls.
+  await page.getByRole('button', { name: 'Montar layout da grade', exact: true }).click();
+  assert.equal(await page.getByRole('heading',{name:'Montar a grade de capas',exact:true}).count(),1,errors.join('\n'));
+  await page.getByLabel('Tamanho da capa de Odara Tattoo', { exact: true }).selectOption('wide');
+  assert.equal(projects[0].card_layout, 'auto', 'preview does not publish on change');
+  assert.equal(await page.locator('.layout-preview .manual-grid').count(), 1);
+  const wideCover = await page.locator('.layout-preview .card-size-wide .project-image').boundingBox();
+  const smallCover = await page.locator('.layout-preview .card-size-auto .project-image').first().boundingBox();
+  assert.ok(wideCover.width > smallCover.width * 1.8, 'wide cover uses its full grid area');
+  await page.locator('.layout-preview .project').nth(0).dragTo(page.locator('.layout-preview .project').nth(1));
+  assert.equal(await page.locator('.layout-control h3').first().textContent(), 'Leão Ice Bubble Tea');
+  await page.screenshot({ path: 'test-results/layout-grid-editor.png', fullPage: true });
+  await page.getByLabel('Ver prévia em', { exact: true }).selectOption('phone');
+  assert.ok((await page.locator('.layout-preview').boundingBox()).width <= 390);
+  await page.getByRole('button', { name: 'Salvar layout da grade', exact: true }).click();
+  await page.getByText('Layout da grade salvo no portfólio.').waitFor();
+  assert.equal(projects[0].slug,'leao-ice-bubble-tea');
+  assert.equal(projects.find(project=>project.slug==='odara-tattoo').card_layout,'wide');
+  const layoutVisitor=await context.newPage();
+  await layoutVisitor.goto(origin+base+'projetos/');
+  await layoutVisitor.locator('.manual-grid .project').first().waitFor();
+  assert.equal(await layoutVisitor.locator('.manual-grid .card-size-wide').count(),1);
+  await layoutVisitor.close();
+  await page.getByRole('button', { name: 'Montar layout da grade', exact: true }).click();
+  await page.getByRole('button', { name: 'Mover Odara Tattoo para antes', exact: true }).click();
+  await page.getByRole('button', { name: 'Usar tamanhos automáticos', exact: true }).click();
+  await page.getByRole('button', { name: 'Salvar layout da grade', exact: true }).click();
+  await page.getByText('Layout da grade salvo no portfólio.').waitFor();
+  assert.equal(projects[0].slug,'odara-tattoo');
+  assert.ok(projects.every(project=>project.card_layout==='auto'));
+  // Another tab changing a project makes a stale layout fail without overwriting it.
+  await page.getByRole('button', { name: 'Montar layout da grade', exact: true }).click();
+  await page.getByLabel('Tamanho da capa de Odara Tattoo', { exact: true }).selectOption('tall');
+  projects[0].updated_at=nextVersion();
+  await page.getByRole('button', { name: 'Salvar layout da grade', exact: true }).click();
+  await page.getByRole('alert').filter({hasText:'alterado em outra aba'}).waitFor();
+  assert.equal(projects[0].card_layout,'auto');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button', { name: 'Voltar aos trabalhos', exact: true }).click();
+  await page.reload();
+  await page.getByRole('heading', { name:'Trabalhos', exact:true }).waitFor();
   await page.getByRole('button', { name: 'Subir Leão Ice Bubble Tea', exact: true }).click();
   await page.getByText('Ordem atualizada no portfólio.').waitFor();
   assert.equal(await page.locator('.row-info h2').first().textContent(), 'Leão Ice Bubble Tea');
@@ -139,6 +195,13 @@ try {
   await page.getByRole('button', { name: 'Subir imagem 2', exact: true }).click();
   assert.equal(await page.getByLabel('Descrição da imagem', { exact: true }).first().inputValue(), 'Segunda imagem.');
   await page.getByLabel('Composição da capa', { exact: true }).selectOption('triptych');
+  await page.getByLabel('Largura da imagem 1', { exact:true }).selectOption('half');
+  await page.getByLabel('Alinhamento da imagem 1', { exact:true }).selectOption('right');
+  assert.equal(await page.locator('.media-preview .media-width-half.media-align-right').count(),1);
+  const previewHalf = await page.locator('.media-preview .media-width-half').boundingBox();
+  const previewGallery = await page.locator('.media-preview .media-layout-gallery').boundingBox();
+  assert.ok(previewHalf.width < previewGallery.width * .6 && previewHalf.x > previewGallery.x + previewGallery.width * .4, 'desktop preview shows a half image aligned right');
+  await page.screenshot({path:'test-results/layout-images-editor.png',fullPage:true});
   await page.getByRole('button', { name: 'Salvar como rascunho', exact: true }).click();
   await page.getByText('Rascunho salvo. Ele não aparece no portfólio.').waitFor();
   await page.reload();
@@ -157,7 +220,8 @@ try {
   await publicPage.getByRole('link', { name: 'Ver projeto Novo projeto de teste', exact: true }).click();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   assert.ok(publicPage.url().includes('projeto/?trabalho=novo-projeto-de-teste'));
-  assert.equal(await publicPage.locator('.project-cover.triptych img').count(), 3);
+  assert.equal(await publicPage.locator('.media-layout-gallery img').count(), 3);
+  assert.equal(await publicPage.locator('.media-width-half.media-align-right img').getAttribute('alt'), 'Segunda imagem.');
   await publicPage.reload();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   // A atualização pública não reapresenta o conteúdo estático em uma falha do banco.

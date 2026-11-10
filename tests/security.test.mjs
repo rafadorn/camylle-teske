@@ -12,7 +12,7 @@ const schemaSql = await readFile(new URL('../supabase/schema.sql', import.meta.u
 const auditSql = await readFile(new URL('../supabase/security-check.sql', import.meta.url), 'utf8');
 
 await db.exec(`
-  create role anon; create role authenticated;
+  create role anon; create role authenticated; create role service_role bypassrls;
   create schema auth; create schema storage;
   create table auth.users (id uuid primary key);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -98,6 +98,50 @@ test('admin can create drafts, publish, edit, reorder, unpublish and delete', as
     await assert.rejects(db.exec(`update public.projects set media='[{"path":"${published}/wrong.jpg","alt":""}]' where id='${draft}'`));
   });
   await asRole('anon', null, async () => assert.equal((await db.query('select count(*)::int as n from storage.objects')).rows[0].n, 1));
+});
+
+test('visual layout writes remain admin-only, validate metadata and reject stale or incomplete saves atomically', async () => {
+  for (const [role, id] of [['anon', null], ['authenticated', outsider]]) {
+    await asRole(role, id, async () => {
+      await assert.rejects(db.exec('select public.save_portfolio_layout(null,null,null)'));
+      if (role === 'anon') await assert.rejects(db.exec("update public.projects set card_layout='wide'"));
+      else await db.exec("update public.projects set card_layout='wide'");
+    });
+  }
+  assert.equal((await db.query("select count(*)::int as n from public.projects where card_layout <> 'auto'")).rows[0].n, 0);
+    await asRole('authenticated', admin, async () => {
+      const rows = (await db.query('select id, updated_at::text as version from public.projects order by position')).rows;
+      const ids = rows.map(row => row.id), versions = rows.map(row => row.version);
+      await assert.rejects(db.query('select public.save_portfolio_layout($1,$2,$3)', [ids, ['bad','auto'], versions]));
+    });
+  await db.exec('begin');
+  try {
+    await asRole('authenticated', admin, async () => {
+      const rows = (await db.query('select id, updated_at::text as version from public.projects order by position')).rows;
+      const ids = rows.map(row => row.id), versions = rows.map(row => row.version);
+      await db.query('select public.save_portfolio_layout($1,$2,$3)', [ids, ['wide','tall'], versions]);
+      assert.deepEqual((await db.query('select card_layout from public.projects order by position')).rows.map(row => row.card_layout), ['wide','tall']);
+      await db.exec(`update public.projects set media='[{"path":"${published}/cover.jpg","alt":"Capa","width":"half","align":"right"}]' where id='${published}'`);
+      assert.equal((await db.query(`select media->0->>'align' as alignment from public.projects where id='${published}'`)).rows[0].alignment, 'right');
+    });
+  } finally { await db.exec('rollback'); }
+  for (const mode of ['stale', 'incomplete', 'duplicate']) {
+      await asRole('authenticated', admin, async () => {
+        const rows = (await db.query('select id, updated_at::text as version from public.projects order by position')).rows;
+        let ids = rows.map(row => row.id), versions = rows.map(row => row.version);
+        if (mode === 'stale') versions[0] = '2000-01-01T00:00:00Z';
+        if (mode === 'incomplete') { ids = ids.slice(0,1); versions = versions.slice(0,1); }
+        if (mode === 'duplicate') ids[1] = ids[0];
+        await assert.rejects(db.query('select public.save_portfolio_layout($1,$2,$3)', [ids, ids.map(() => 'wide'), versions]));
+      });
+  }
+  for (const metadata of [{width:'url(evil)'},{width:null},{width:4},{align:'outside'},{align:null}]) {
+    await asRole('authenticated', admin, async () => {
+      const media = JSON.stringify([{path: published + '/cover.jpg',alt:'Capa',...metadata}]);
+      await assert.rejects(db.query('update public.projects set media=$1 where id=$2', [media, published]));
+    });
+  }
+  assert.equal((await db.query("select count(*)::int as n from public.projects where card_layout <> 'auto'")).rows[0].n, 0);
 });
 
 async function runSecurityAudit() {

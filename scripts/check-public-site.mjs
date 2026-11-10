@@ -35,9 +35,9 @@ for (const [path, ...expected] of checks) {
   assert.ok(html.includes("script-src 'self'") && html.includes("object-src 'none'"), `${path}: security policy`);
   assert.ok(!html.includes('@@') && !html.includes('Proposta visual 01'), `${path}: no approval placeholders`);
 }
-const stylePath = home.match(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/)?.[1];
-assert.ok(stylePath, 'production stylesheet');
-const css = await (await read(stylePath)).text();
+const stylePaths = [...home.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)].map(match => match[1]);
+assert.ok(stylePaths.length, 'production stylesheet');
+const css = (await Promise.all(stylePaths.map(async path => (await read(path)).text()))).join('\n');
 assert.ok(css.includes('Bogue Light PDF') && css.includes('wordmark'), 'cover typography');
 for (const font of ['fonts/bogue-light-pdf.woff', 'fonts/acid-grotesk-light-pdf.woff']) {
   const response = await read(font);

@@ -1,6 +1,7 @@
 import { createPrivacy } from './privacy.js';
 import './styles.css';
 import './privacy.css';
+import './layout.css';
 import './menu.js';
 import initialProjects from './initial-projects.json';
 import { configured, listProjects } from './backend.js';

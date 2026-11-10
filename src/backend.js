@@ -22,6 +22,7 @@ function check(result) {
 }
 
 export function friendlyError(error) {
+  if (error?.code === '40001' || error?.code === 'PGRST116') return 'Este trabalho ou layout foi alterado em outra aba. Volte à lista, atualize e tente novamente para preservar as alterações mais recentes.';
   if (error?.code === '23505') return 'Esse endereço já pertence a outro trabalho. Escolha outro.';
   if (error?.code === '42501' || /row.level security|permission denied/i.test(error?.message || '')) return 'Sua conta não tem permissão para editar o portfólio.';
   if (/Invalid login credentials/i.test(error?.message || '')) return 'E-mail ou senha incorretos.';
@@ -49,7 +50,19 @@ export async function listProjects(admin = false) {
 }
 
 export async function saveProject(project) {
+  if (project.updated_at) {
+    const { id, ...record } = recordForSave(project);
+    return check(await client.from('projects').update(record).eq('id', id).eq('updated_at', project.updated_at).select().single());
+  }
   return check(await client.from('projects').upsert(recordForSave(project)).select().single());
+}
+
+export async function savePortfolioLayout(projects) {
+  return check(await client.rpc('save_portfolio_layout', {
+    project_ids: projects.map(project => project.id),
+    card_layouts: projects.map(project => project.card_layout || 'auto'),
+    expected_versions: projects.map(project => project.updated_at),
+  }));
 }
 
 export async function uploadImage(projectId, file) {

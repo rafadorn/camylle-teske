@@ -15,4 +15,5 @@ await check('/functions/v1/record-portfolio-view', { method: 'HEAD' }, [204]);
 await check('/functions/v1/record-portfolio-view', { method: 'POST', body: JSON.stringify({ path: '/', consent: 'refused' }) }, [400]);
 await check('/rest/v1/rpc/record_portfolio_page_view', { method: 'POST', body: JSON.stringify({ page_path: '/' }) }, [401, 403, 404]);
 await check('/rest/v1/rpc/portfolio_analytics', { method: 'POST', body: JSON.stringify({ days: 30 }) }, [401, 403, 404]);
+await check('/rest/v1/rpc/save_portfolio_layout', { method: 'POST', body: JSON.stringify({ project_ids: [], card_layouts: [], expected_versions: [] }) }, [401, 403, 404]);
 console.log('Analytics backend OK: collector/RPC available; refusal rejected; anonymous writes and private reports blocked. No page views created.');

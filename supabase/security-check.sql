@@ -28,17 +28,18 @@ target_tables as (
   from (values ('public.projects'), ('private.portfolio_admins'), ('storage.objects')) as expected(name)
   left join pg_catalog.pg_class c on c.oid = pg_catalog.to_regclass(expected.name)
 ),
+-- PostgreSQL 18 catalogs NOT NULL as constraints; attnotnull below checks them on every version.
 table_shape as (
   select t.name, t.oid,
     (select md5(string_agg(pg_catalog.pg_get_constraintdef(c.oid, false),
       '|' order by c.contype, pg_catalog.pg_get_constraintdef(c.oid, false)))
-      from pg_catalog.pg_constraint c where c.conrelid = t.oid) = e.constraints_hash as constraints_match,
+      from pg_catalog.pg_constraint c where c.conrelid = t.oid and c.contype <> 'n') = e.constraints_hash as constraints_match,
     (select md5(string_agg(a.attname || ':' || pg_catalog.format_type(a.atttypid, a.atttypmod) || ':' || a.attnotnull::text,
       '|' order by a.attnum)) from pg_catalog.pg_attribute a
       where a.attrelid = t.oid and a.attnum > 0 and not a.attisdropped) = e.columns_hash as columns_match
   from target_tables t join (values
-    ('public.projects', 'a50835964626a8f713c5f4b3b27e41d7', 'b82f5477c8cdbee6a7de58e663e2892d'),
-    ('private.portfolio_admins', 'c695ab624991a50da501f221713ecb58', '73c0aa9a292638f2933fc44927fd0f35')
+    ('public.projects', '1a569789615c3f4d3fa904b66ce3a39d', '5bf08abc92c96e0539b19f81a748a7ed'),
+    ('private.portfolio_admins', '9eae5959f25b189d3fb724b429503c37', '73c0aa9a292638f2933fc44927fd0f35')
   ) e(name, constraints_hash, columns_hash) on e.name = t.name
 ),
 -- Hashes dos predicados canônicos com search_path vazio. Nenhum whitespace é

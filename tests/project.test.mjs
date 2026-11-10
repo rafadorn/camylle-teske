@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { slugify, validateProject, validateImage, recordForSave } from '../src/project.js';
-import { detail } from '../src/render.js';
+import { detail, works } from '../src/render.js';
 import { validatePublicConfig, withProjectDefaults } from '../scripts/public-config.mjs';
 
 const projects = JSON.parse(await readFile(new URL('../src/initial-projects.json', import.meta.url), 'utf8'));
@@ -47,4 +47,18 @@ test('user text cannot inject HTML and saved records omit temporary data', () =>
   assert.equal(saved.media[0].url, undefined);
   assert.equal(saved.media[0].local, undefined);
   assert.equal(slugify('Ígara Saúde — 2026'), 'igara-saude-2026');
+});
+
+test('visual layout metadata persists safely while existing projects retain the approved automatic layout', () => {
+  const p = {...projects[2], card_layout:'wide', media:projects[2].media.map((media,index) => ({...media,width:'half',align:index===0?'right':'auto'}))};
+  assert.doesNotThrow(() => validateProject(p));
+  const record=recordForSave(p);
+  assert.equal(record.card_layout,'wide');assert.equal(record.media[0].align,'right');
+  assert.ok(works([p]).includes('manual-grid'));
+  assert.ok(detail(p).includes('media-width-half media-align-right'));
+  assert.ok(!works(projects).includes('manual-grid'));
+  assert.ok(!detail(projects[0]).includes('media-layout-gallery'));
+  assert.throws(() => validateProject({...p,card_layout:'x" onclick="evil'}));
+  assert.throws(() => validateProject({...p,media:[{...p.media[0],width:'url(evil)'}]}));
+  assert.ok(!detail({...p,media:[{...p.media[0],align:'x" onclick="evil'}]}).includes('onclick'));
 });

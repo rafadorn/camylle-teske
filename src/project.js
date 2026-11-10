@@ -1,3 +1,4 @@
+import { validateLayout, cardLayout } from './layout.js';
 export const BUCKET = 'portfolio';
 export const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 export const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -12,6 +13,7 @@ export function escapeHTML(text = '') {
 }
 
 export function validateProject(project) {
+  validateLayout(project);
   if (!project.title?.trim()) throw new Error('Escreva o título do trabalho.');
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project.slug || '')) throw new Error('Use letras, números e hífens no endereço do trabalho.');
   if (project.title.length > 160 || project.category.length > 160 || project.description.length > 12000) throw new Error('O texto ultrapassa o limite do campo.');
@@ -38,7 +40,8 @@ export function recordForSave(project) {
     category: project.category.trim(), description: project.description.trim(),
     position: project.position, status: project.status, cover_layout: project.cover_layout,
     cover_path: project.cover_path || null,
-    media: project.media.map(({ path, alt }) => ({ path, alt: alt || '' })),
+    card_layout: cardLayout(project),
+    media: project.media.map(({ path, alt, width, align }) => ({ path, alt: alt || '', ...(width !== undefined ? { width } : {}), ...(align !== undefined ? { align } : {}) })),
   };
 }
 
