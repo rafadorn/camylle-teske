@@ -2,6 +2,7 @@ import { mountAnalytics } from './admin-analytics.js';
 import './admin-base.css';
 import './admin.css';
 import './layout.css';
+import './navigation.css';
 import { mountCoverLayout, bindLayoutDrag } from './admin-layout.js';
 import { CARD_LAYOUTS, IMAGE_WIDTHS, IMAGE_ALIGNS, hasImageLayout, imageWidth, imageAlign } from './layout.js';
 import { projectGallery } from './render.js';
@@ -168,6 +169,19 @@ function leaveEditor() {
   return true;
 }
 
+document.querySelector('[data-admin-home]')?.addEventListener('click', event => {
+  if (!auth.userId || recovery) return;
+  event.preventDefault();
+  if (leaveEditor()) void enter();
+});
+
+function editorNavigation(project) {
+  const index = project ? projects.findIndex(item => item.id === project.id) : -1;
+  const previous = index > 0 ? projects[index - 1] : null;
+  const next = index >= 0 && index < projects.length - 1 ? projects[index + 1] : null;
+  return `<nav class="editor-navigation" aria-label="Navegação entre trabalhos no painel">${previous ? `<button type="button" data-editor-step="${previous.id}">← Trabalho anterior</button>` : '<span aria-hidden="true"></span>'}<button type="button" data-editor-home>Início do painel</button>${next ? `<button type="button" data-editor-step="${next.id}">Próximo trabalho →</button>` : '<span aria-hidden="true"></span>'}</nav>`;
+}
+
 function openCoverLayout() {
   if (saving || !projects.length) return;
   const ticket = auth.capture();
@@ -264,8 +278,13 @@ function openEditor(project) {
   };
   editor.isNew = !project; editor.originalPaths = project?.media.map(m => m.path) || [];
   dirty = false;
-  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div><form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
+  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div>${editorNavigation(project)}<form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
   root.querySelector('#back').addEventListener('click', () => { if (leaveEditor()) overview(); });
+  root.querySelector('[data-editor-home]').addEventListener('click', () => { if (leaveEditor()) overview(); });
+  root.querySelectorAll('[data-editor-step]').forEach(button => button.addEventListener('click', () => {
+    const target = projects.find(item => item.id === button.dataset.editorStep);
+    if (target && leaveEditor()) openEditor(target);
+  }));
   const form = root.querySelector('form');
   let customSlug = false;
   form.slug.addEventListener('input', () => { customSlug = true; });

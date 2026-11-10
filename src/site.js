@@ -3,6 +3,8 @@ import './styles.css';
 import './privacy.css';
 import './layout.css';
 import './menu.js';
+import './navigation.css';
+import { pageNavigation, projectNavigation } from './navigation.js';
 import initialProjects from './initial-projects.json';
 import { configured, listProjects } from './backend.js';
 import { works, detail } from './render.js';
@@ -20,6 +22,7 @@ async function load() {
   if (!['work', 'project'].includes(page)) return;
   // A versão estática só é usada antes de ativar o banco, nunca em uma falha dele.
   if (configured) main.innerHTML = '<p class="page-message" role="status">Carregando trabalhos…</p>';
+  if (page === 'project') document.querySelector('[data-page-controls]').innerHTML = pageNavigation('project', base);
   try {
     const projects = configured ? await listProjects() : initialProjects;
     if (page === 'work') { main.innerHTML = works(projects, base); privacy?.page('/projetos/'); return; }
@@ -33,6 +36,7 @@ async function load() {
     document.title = `${project.title} — Camylle Teske`;
     document.querySelector('meta[name="description"]').content = project.description;
     main.innerHTML = detail(project, projects, base);
+    document.querySelector('[data-page-controls]').innerHTML = projectNavigation(project, projects, base);
     privacy?.page('/projetos/' + project.slug + '/');
   } catch {
     main.innerHTML = '<div class="page-message" role="alert"><p>Não foi possível carregar os trabalhos agora.</p><button type="button" class="retry">Tentar novamente</button></div>';

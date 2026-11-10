@@ -132,6 +132,10 @@ anônimas às funções privilegiadas precisam ser rejeitadas. Esse teste não d
 ser usado como contagem de visita nem como substituto da checagem de saúde dos
 trabalhos publicados.
 
+### Navegar pelo site e pelo painel
+
+O menu **Início** volta à capa. Os botões **Voltar / Avançar** indicam o destino nas páginas e permitem passar entre trabalhos publicados. No painel, **Início do painel** retorna à lista, e o editor permite abrir o trabalho anterior ou seguinte. Sair de uma edição sem salvar pede confirmação.
+
 ### Montar o layout pelo painel
 
 Em **Trabalhos > Montar layout da grade**, arrastar as capas ou usar **Antes / Depois**, escolher pequena, larga, alta, destaque ou largura inteira e conferir a prévia de celular. **Salvar layout da grade** aplica ordem e tamanhos juntos; sair sem salvar descarta a montagem. Rascunhos ficam fora da prévia pública. **Usar tamanhos automáticos** recupera a composição aprovada sem mudar a ordem escolhida.

@@ -132,6 +132,22 @@ try {
   assert.equal(await page.locator('.analytics-report > .analytics-table tbody tr').count(), 2);
   await page.screenshot({ path: 'test-results/analytics-admin.png', fullPage: true });
   await page.getByText('Estatísticas de acesso', { exact: true }).click();
+  // Navigation inside the admin respects unsaved work before switching projects or returning home.
+  await page.locator('.work-row').first().getByRole('button',{name:'Editar',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Odara Tattoo');
+  await page.getByRole('button',{name:'Próximo trabalho →',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Leão Ice Bubble Tea');
+  await page.getByLabel('Título',{exact:true}).fill('Texto ainda não salvo');
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'← Trabalho anterior',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Texto ainda não salvo');
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('link',{name:'Início do painel',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Texto ainda não salvo');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('link',{name:'Início do painel',exact:true}).click();
+  await page.getByRole('heading',{name:'Trabalhos',exact:true}).waitFor();
+  assert.equal(projects.find(project=>project.slug==='leao-ice-bubble-tea').title,'Leão Ice Bubble Tea');
   // Compose the public grid without writing until Save, using drag and accessible controls.
   await page.getByRole('button', { name: 'Montar layout da grade', exact: true }).click();
   assert.equal(await page.getByRole('heading',{name:'Montar a grade de capas',exact:true}).count(),1,errors.join('\n'));
@@ -384,6 +400,13 @@ try {
     assert.equal(await mobile.locator('nav a[aria-current="page"]').textContent(), 'Sobre');
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     if (width === 390) await mobile.screenshot({ path: 'test-results/about-mobile.png', fullPage: true });
+    await mobile.getByRole('link',{name:'Voltar à página inicial',exact:true}).click();
+    await mobile.getByRole('heading',{name:'Camylle Teske',exact:true}).waitFor();
+    await mobile.getByRole('link',{name:'Avançar para Projetos',exact:true}).click();
+    await mobile.locator('.project').first().waitFor();
+    await mobile.getByRole('link',{name:'Avançar para Sobre',exact:true}).click();
+    await mobile.getByRole('heading',{name:'Sobre Mim',exact:true}).waitFor();
+
     await mobile.getByRole('link', { name: 'Contato', exact: true }).click();
     await mobile.getByRole('heading', { name: 'Vamos conversar?', exact: true }).waitFor();
     assert.equal(await mobile.locator('.email-link').getAttribute('href'), 'mailto:teske.camy@gmail.com');
@@ -398,6 +421,16 @@ try {
     await mobile.locator('.project').first().tap();
     await mobile.locator('.project-detail').waitFor();
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    const currentProject=mobile.url();
+    await mobile.locator('.page-controls .page-nav-next').click();
+    await mobile.locator('.project-detail').waitFor();
+    assert.notEqual(mobile.url(),currentProject);
+    await mobile.locator('.page-controls .page-nav-previous').click();
+    await mobile.locator('.project-detail').waitFor();
+    assert.equal(mobile.url(),currentProject);
+    await mobile.getByRole('link',{name:'Início',exact:true}).click();
+    await mobile.getByRole('heading',{name:'Camylle Teske',exact:true}).waitFor();
+
   }
   await touch.close();
 

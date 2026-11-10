@@ -9,7 +9,7 @@ const checks = [
   ['sobre/', 'data-page="about"', 'about-title'],
   ['contato/', 'data-page="contact"', 'mailto:teske.camy@gmail.com'],
   ['privacidade/', 'data-page="privacy"', 'Privacidade e suas escolhas'],
-  ['admin/', 'noindex,nofollow', 'src='],
+  ['admin/', 'noindex,nofollow', 'data-admin-home'],
   ['projetos/odara-tattoo/', 'data-page="project"', 'data-slug="odara-tattoo"'],
 ];
 async function read(path) {
@@ -22,7 +22,7 @@ let home;
 for (let attempt = 0; attempt < 30; attempt++) {
   try {
     home = await (await read('')).text();
-    assert.ok(home.includes('data-page="home"') && home.includes('class="wordmark"'));
+    assert.ok(home.includes('data-page="home"') && home.includes('class="wordmark"') && home.includes('>Início</a>'));
     break;
   } catch (error) {
     if (attempt === 29) throw error;
