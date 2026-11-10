@@ -135,6 +135,10 @@ try {
   // Navigation inside the admin respects unsaved work before switching projects or returning home.
   await page.locator('.work-row').first().getByRole('button',{name:'Editar',exact:true}).click();
   assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Odara Tattoo');
+  await page.getByRole('button',{name:'Montar layout das imagens',exact:true}).click();
+  await page.getByLabel('Dispositivo da prévia das imagens',{exact:true}).selectOption('phone');
+  await page.getByRole('button',{name:'Voltar aos dados do trabalho',exact:true}).click();
+
   await page.getByRole('button',{name:'Próximo trabalho →',exact:true}).click();
   assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Leão Ice Bubble Tea');
   await page.getByLabel('Título',{exact:true}).fill('Texto ainda não salvo');
@@ -205,19 +209,49 @@ try {
   await page.locator('#upload').setInputFiles([
     { name: 'segunda.png', mimeType: 'image/png', buffer: upload },
     { name: 'terceira.png', mimeType: 'image/png', buffer: upload },
+    ...Array.from({length:4},(_,index)=>({name:`extra-${index}.png`,mimeType:'image/png',buffer:upload})),
   ]);
-  await page.getByText('3 / 40', { exact: true }).waitFor();
+  await page.getByText('7 / 40', { exact: true }).waitFor();
   await page.getByLabel('Descrição da imagem', { exact: true }).nth(1).fill('Segunda imagem.');
   await page.getByRole('button', { name: 'Subir imagem 2', exact: true }).click();
   assert.equal(await page.getByLabel('Descrição da imagem', { exact: true }).first().inputValue(), 'Segunda imagem.');
   await page.getByLabel('Composição da capa', { exact: true }).selectOption('triptych');
   await page.getByLabel('Largura da imagem 1', { exact:true }).selectOption('half');
   await page.getByLabel('Alinhamento da imagem 1', { exact:true }).selectOption('right');
-  assert.equal(await page.locator('.media-preview .media-width-half.media-align-right').count(),1);
+  await page.getByRole('button',{name:'Montar layout das imagens',exact:true}).click();
+  assert.equal(await page.locator('.image-editor-thumbnails button').count(),7);
+  assert.equal(await page.locator('.image-editor-frame').count(),7);
+  await page.getByRole('button',{name:'Três por linha',exact:true}).click();
+  assert.equal(await page.locator('.media-preview .media-width-third').count(),7);
+  assert.equal(projects.some(project=>project.title==='Novo projeto de teste'),false,'visual changes stay local before save');
+  await page.getByRole('button',{name:'Selecionar imagem 1',exact:true}).dragTo(page.getByRole('button',{name:'Selecionar imagem 7',exact:true}));
+  assert.equal(await page.locator('.image-selected-number').textContent(),'Imagem 7 de 7');
+  for(let index=0;index<6;index++) await page.getByRole('button',{name:'← Antes',exact:true}).click();
+  assert.equal(await page.locator('.image-selected-number').textContent(),'Imagem 1 de 7');
+  await page.getByRole('button',{name:'Definir tamanho: Metade',exact:true}).click();
+  await page.locator('.image-inspector').getByRole('button',{name:'Direita',exact:true}).click();
   const previewHalf = await page.locator('.media-preview .media-width-half').boundingBox();
   const previewGallery = await page.locator('.media-preview .media-layout-gallery').boundingBox();
-  assert.ok(previewHalf.width < previewGallery.width * .6 && previewHalf.x > previewGallery.x + previewGallery.width * .4, 'desktop preview shows a half image aligned right');
-  await page.screenshot({path:'test-results/layout-images-editor.png',fullPage:true});
+  assert.ok(previewHalf.width < previewGallery.width * .6 && previewHalf.x > previewGallery.x + previewGallery.width * .4, 'canvas adjusts selected image size and alignment');
+  await page.screenshot({path:'test-results/visual-project-editor-desktop.png',fullPage:true});
+  await page.getByLabel('Dispositivo da prévia das imagens',{exact:true}).selectOption('phone');
+  const phoneImage=await page.locator('.media-preview .media-width-half').boundingBox();
+  const phoneGallery=await page.locator('.media-preview .media-layout-gallery').boundingBox();
+  assert.ok(Math.abs(phoneImage.width-phoneGallery.width)<1,'phone preview stacks images without changing saved widths');
+  await page.getByLabel('Dispositivo da prévia das imagens',{exact:true}).selectOption('desktop');
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'visual editor fits a phone');
+  await page.screenshot({path:'test-results/visual-project-editor-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:900});
+  await page.getByRole('button',{name:'Voltar aos dados do trabalho',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).inputValue(),'Novo projeto de teste');
+  assert.equal(await page.getByLabel('Descrição da imagem',{exact:true}).first().inputValue(),'Segunda imagem.');
+  // Native validation reveals the required data fields when saving from the visual view.
+  await page.getByLabel('Título',{exact:true}).fill('');
+  await page.getByRole('button',{name:'Montar layout das imagens',exact:true}).click();
+  await page.getByRole('button',{name:'Salvar como rascunho',exact:true}).click();
+  assert.equal(await page.getByLabel('Título',{exact:true}).isVisible(),true);
+  await page.getByLabel('Título',{exact:true}).fill('Novo projeto de teste');
   await page.getByRole('button', { name: 'Salvar como rascunho', exact: true }).click();
   await page.getByText('Rascunho salvo. Ele não aparece no portfólio.').waitFor();
   await page.reload();
@@ -228,6 +262,10 @@ try {
   await publicPage.locator('.project').first().waitFor();
   assert.equal(await publicPage.locator('.project').count(), 6, 'draft not shown to visitors');
   await page.locator('.work-row').filter({ hasText: 'Novo projeto de teste' }).getByRole('button', { name: 'Editar', exact: true }).click();
+  await page.getByRole('button',{name:'Montar layout das imagens',exact:true}).click();
+  await page.getByRole('button',{name:'Selecionar miniatura 1',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Definir tamanho: Metade',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await page.locator('.image-inspector').getByRole('button',{name:'Direita',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('button', { name: 'Salvar e publicar', exact: true }).click();
   await page.getByText('Trabalho publicado no portfólio.').waitFor();
   await publicPage.reload();
@@ -236,7 +274,7 @@ try {
   await publicPage.getByRole('link', { name: 'Ver projeto Novo projeto de teste', exact: true }).click();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   assert.ok(publicPage.url().includes('projeto/?trabalho=novo-projeto-de-teste'));
-  assert.equal(await publicPage.locator('.media-layout-gallery img').count(), 3);
+  assert.equal(await publicPage.locator('.media-layout-gallery img').count(), 7);
   assert.equal(await publicPage.locator('.media-width-half.media-align-right img').getAttribute('alt'), 'Segunda imagem.');
   await publicPage.reload();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
@@ -294,9 +332,15 @@ try {
   await otherTab.getByRole('heading', { name: 'Trabalhos', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Novo trabalho', exact: true }).click();
   await page.getByLabel('Título', { exact: true }).fill('Texto privado ainda não salvo');
+  await page.locator('#upload').setInputFiles({name:'privada.png',mimeType:'image/png',buffer:upload});
+  await page.getByText('Imagens adicionadas. Salve o trabalho para enviar.').waitFor();
+  await page.getByRole('button',{name:'Montar layout das imagens',exact:true}).click();
+  assert.equal(await page.locator('.image-editor-frame').count(),1);
+
   await otherTab.getByRole('button', { name: 'Sair', exact: true }).click();
   await page.getByRole('heading', { name: 'Oi, Camy.', exact: true }).waitFor();
   assert.equal(await page.locator('#project-form').count(), 0);
+  assert.equal(await page.locator('.image-editor-frame').count(),0,'signing out removes the open visual workspace');
   await otherTab.close();
   // A signed-in account without the admin allowlist never gets the editor.
   allowAdmin = false;

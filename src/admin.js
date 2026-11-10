@@ -3,9 +3,10 @@ import './admin-base.css';
 import './admin.css';
 import './layout.css';
 import './navigation.css';
+import './image-layout-editor.css';
+import { mountImageLayoutEditor } from './image-layout-editor.js';
 import { mountCoverLayout, bindLayoutDrag } from './admin-layout.js';
 import { CARD_LAYOUTS, IMAGE_WIDTHS, IMAGE_ALIGNS, hasImageLayout, imageWidth, imageAlign } from './layout.js';
-import { projectGallery } from './render.js';
 import { client, configured, secureConnection, listProjects, saveProject, uploadImage, removeImages, deleteProject, reorderProjects, savePortfolioLayout, friendlyError } from './backend.js';
 import { slugify, validateImage, validateProject, escapeHTML as e } from './project.js';
 import { importInitial, initialImportState } from './import-initial.js';
@@ -14,6 +15,7 @@ import { createAuthBoundary, httpsLocation, sessionExpired } from './security.js
 const root = document.querySelector('#admin');
 const base = import.meta.env.BASE_URL;
 let projects = [], editor = null, dirty = false, saving = false, processingImages = false;
+let imageLayoutEditor = null;
 let recovery = new URLSearchParams(location.search).get('senha') === 'alterar';
 const auth = createAuthBoundary();
 let entering = null;
@@ -30,6 +32,7 @@ function message(text, error = false) {
 function busy(button, value) { button.disabled = value; button.setAttribute('aria-busy', String(value)); }
 
 function clearEditor() {
+  imageLayoutEditor?.destroy(); imageLayoutEditor = null;
   for (const media of editor?.media || []) if (media.blob) URL.revokeObjectURL(media.blob);
   editor = null; dirty = false; processingImages = false;
 }
@@ -278,7 +281,7 @@ function openEditor(project) {
   };
   editor.isNew = !project; editor.originalPaths = project?.media.map(m => m.path) || [];
   dirty = false;
-  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div>${editorNavigation(project)}<form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
+  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div>${editorNavigation(project)}<form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><div class="image-layout-launch"><button type="button" class="secondary" data-open-image-layout>Montar layout das imagens</button><p>Abra a montagem visual para posicionar as imagens e ajustar os tamanhos.</p></div><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
   root.querySelector('#back').addEventListener('click', () => { if (leaveEditor()) overview(); });
   root.querySelector('[data-editor-home]').addEventListener('click', () => { if (leaveEditor()) overview(); });
   root.querySelectorAll('[data-editor-step]').forEach(button => button.addEventListener('click', () => {
@@ -286,18 +289,54 @@ function openEditor(project) {
     if (target && leaveEditor()) openEditor(target);
   }));
   const form = root.querySelector('form');
+  const section = form.querySelector('.image-layout-section');
+  const fields = form.querySelector('.editor-grid');
+  fields.after(section); section.hidden = true; section.classList.add('visual-image-editor');
+  const editingImages = editor, imageTicket = auth.capture();
+  const canEditImages = () => auth.current(imageTicket) && editor === editingImages && !saving && !processingImages;
+  function setImageLayoutMode(open) {
+    fields.hidden = open; section.hidden = !open;
+    if (open) {
+      imageLayoutEditor.render(); imageLayoutEditor.focus(); section.scrollIntoView({ block: 'start' });
+    } else {
+      root.querySelector('[data-open-image-layout]').focus({ preventScroll: true });
+    }
+  }
+  imageLayoutEditor = mountImageLayoutEditor(section, {
+    base, current: canEditImages,
+    getProject: () => editor === editingImages ? { ...editor, title: form.title.value, cover_layout: form.cover_layout.value } : null,
+    change: (index, field, value) => {
+      const options = field === 'width' ? IMAGE_WIDTHS : field === 'align' ? IMAGE_ALIGNS : null;
+      if (!canEditImages() || !editor.media[index] || !options || !Object.hasOwn(options, value)) return;
+      enableImageLayout(); editor.media[index][field] = value; dirty = true; renderMedia();
+    },
+    move: moveImage,
+    preset: width => {
+      if (!canEditImages() || !Object.hasOwn(IMAGE_WIDTHS, width)) return;
+      editor.media.forEach(media => { media.width = width; media.align = 'auto'; });
+      dirty = true; renderMedia();
+    },
+    reset: () => {
+      if (!canEditImages()) return;
+      editor.media.forEach(media => { delete media.width; delete media.align; }); dirty = true; renderMedia();
+    },
+    close: () => setImageLayoutMode(false), addImages: () => root.querySelector('#upload').click(),
+  });
+  root.querySelector('[data-open-image-layout]').addEventListener('click', () => setImageLayoutMode(true));
+  form.addEventListener('invalid', event => { if (!section.hidden && event.target.closest('.editor-grid')) setImageLayoutMode(false); }, true);
   let customSlug = false;
   form.slug.addEventListener('input', () => { customSlug = true; });
   form.title.addEventListener('input', () => { if (editor.isNew && !customSlug) form.slug.value = slugify(form.title.value); });
-  form.addEventListener('input', () => { dirty = true; });
-  form.addEventListener('change', () => { dirty = true; });
+  const markChanged = event => { if (!event.target.matches('#image-preview-device')) dirty = true; };
+  form.addEventListener('input', markChanged);
+  form.addEventListener('change', markChanged);
   form.addEventListener('submit', event => { event.preventDefault(); persist('published'); });
   root.querySelector('#draft').addEventListener('click', () => { if (form.reportValidity()) persist('draft'); });
   root.querySelector('#upload').addEventListener('change', async event => {
     if (saving || processingImages || !editor) return;
     const input = event.target, files = [...input.files], editing = editor, ticket = auth.capture();
     const current = () => auth.current(ticket) && editor === editing;
-    processingImages = true; input.disabled = true;
+    processingImages = true; input.disabled = true; imageLayoutEditor?.render();
     const saveButtons = [...root.querySelectorAll('#project-form button[type="submit"],#draft,#delete')];
     saveButtons.forEach(button => button.disabled = true);
     message('Preparando as imagens…');
@@ -321,7 +360,8 @@ function openEditor(project) {
     finally {
       input.value = '';
       if (current()) {
-        processingImages = false; input.disabled = false;
+        processingImages = false; input.disabled = false; imageLayoutEditor?.render();
+        root.querySelector('[data-open-image-layout]').disabled = !editing.media.length;
         saveButtons.forEach(button => button.disabled = false);
       }
     }
@@ -354,14 +394,13 @@ function openEditor(project) {
       }
     } finally { if (current()) saving = false; }
   });
-  root.querySelector('#image-preview-device').addEventListener('change', event => root.querySelector('.media-preview').classList.toggle('preview-phone', event.target.value === 'phone'));
-  root.querySelector('#reset-image-layout').addEventListener('click', () => { if (saving || !editor) return; editor.media.forEach(media => { delete media.width; delete media.align; }); dirty = true; renderMedia(); });
   form.cover_layout.addEventListener('change', renderImagePreview);
   bindLayoutDrag(root.querySelector('#media-list'), () => editor?.media.map(media => media.path) || [], moveImage, () => Boolean(editor && !saving && !processingImages));
   renderMedia(); window.scrollTo(0, 0);
 }
 
 function renderMedia() {
+  root.querySelector('[data-open-image-layout]').disabled = !editor.media.length || saving || processingImages;
   root.querySelector('[data-count]').textContent = `${editor.media.length} / 40`;
   root.querySelector('#media-list').innerHTML = editor.media.map((m, i) => `<article class="media-item" data-layout-id="${e(m.path)}" draggable="true"><img src="${e(m.url)}" alt="${e(m.alt)}"><div><div class="media-heading"><span>Imagem ${i + 1}</span><button type="button" class="cover-button${m.path === editor.cover_path ? ' selected' : ''}" data-cover="${i}" aria-pressed="${m.path === editor.cover_path}">${m.path === editor.cover_path ? 'Capa escolhida' : 'Usar como capa'}</button></div><label>Descrição da imagem<input data-alt="${i}" value="${e(m.alt)}" maxlength="600" placeholder="Descreva a imagem para acessibilidade"></label><div class="media-placement"><label>Largura da imagem ${i + 1}<select data-image-width="${i}" aria-label="Largura da imagem ${i + 1}">${Object.entries(IMAGE_WIDTHS).map(([value,label]) => `<option value="${value}"${imageWidth(m) === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label><label>Alinhamento da imagem ${i + 1}<select data-image-align="${i}" aria-label="Alinhamento da imagem ${i + 1}">${Object.entries(IMAGE_ALIGNS).map(([value,label]) => `<option value="${value}"${imageAlign(m) === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label></div><div class="media-actions"><button type="button" data-reorder="${i}" data-direction="-1" aria-label="Subir imagem ${i + 1}" ${i === 0 ? 'disabled' : ''}>Subir</button><button type="button" data-reorder="${i}" data-direction="1" aria-label="Descer imagem ${i + 1}" ${i === editor.media.length - 1 ? 'disabled' : ''}>Descer</button><button type="button" class="plain" data-remove="${i}">Remover</button></div></div></article>`).join('') || '<p class="empty-media">As imagens que você escolher aparecem aqui.</p>';
   root.querySelectorAll('[data-alt]').forEach(input => input.addEventListener('input', () => { editor.media[Number(input.dataset.alt)].alt = input.value; dirty = true; }));
@@ -399,15 +438,10 @@ function moveImage(from, to) {
   enableImageLayout();
   const [media] = editor.media.splice(from, 1); editor.media.splice(to, 0, media);
   dirty = true; renderMedia();
-  root.querySelector(`[data-alt="${to}"]`)?.focus({ preventScroll: true });
+  if (!root.querySelector('.editor-grid').hidden) root.querySelector(`[data-alt="${to}"]`)?.focus({ preventScroll: true });
 }
 
-function renderImagePreview() {
-  const preview = root.querySelector('.media-preview');
-  if (!preview || !editor) return;
-  const project = { ...editor, cover_layout: root.querySelector('[name="cover_layout"]').value };
-  preview.innerHTML = project.media.length ? projectGallery(project, base) : '<p class="empty-media">Adicione imagens para ver a composição.</p>';
-}
+function renderImagePreview() { imageLayoutEditor?.render(); }
 
 async function persist(status) {
   if (saving || !editor) return;
@@ -418,7 +452,7 @@ async function persist(status) {
   const record = { ...editing, title: form.title.value, slug: form.slug.value, category: form.category.value,
     description: form.description.value, cover_layout: form.cover_layout.value, status };
   try { validateProject(record); } catch (error) { message(friendlyError(error), true); return; }
-  saving = true;
+  saving = true; imageLayoutEditor?.render();
   root.querySelectorAll('button,input,textarea,select').forEach(node => node.disabled = true);
   message('Enviando imagens e salvando trabalho…');
   try {
