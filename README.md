@@ -2,6 +2,8 @@
 
 Layout aprovado: capa com Camylle Teske em Bogue-Light, Sobre e Projetos em páginas separadas, grade assimétrica e capas estáticas. Apenas o fundo do menu acompanha o mouse e o foco do teclado. Os trabalhos continuam sendo publicados pelo painel, sem recompilar o site. As fontes e imagens são servidas pelo próprio site; DM Sans cobre os caracteres ausentes dos subconjuntos do PDF.
 
+O título “Vamos conversar?” usa exclusivamente `public/fonts/camy-lettering.woff`, uma recriação visual aproximada aprovada em 11/11/2026. É uma fonte parcial feita a partir de lettering gerado com os prints como referência, com V maiúsculo e interrogação interpretados. Não é a Bogue original e não contém os binários do pacote DEMO. Sua cobertura se limita a espaço, `?`, `V`, `a`, `c`, `e`, `m`, `n`, `o`, `r`, `s` e `v`; não usar em outros textos sem conferir os caracteres.
+
 O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel `/admin/`. O Supabase guarda login, projetos e novas imagens. A Camy publica pelo painel, sem acessar GitHub, Wix ou arquivos de código.
 
 ## O que já está preparado

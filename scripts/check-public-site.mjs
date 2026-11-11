@@ -39,7 +39,8 @@ const stylePaths = [...home.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]
 assert.ok(stylePaths.length, 'production stylesheet');
 const css = (await Promise.all(stylePaths.map(async path => (await read(path)).text()))).join('\n');
 assert.ok(css.includes('Bogue Light PDF') && css.includes('wordmark'), 'cover typography');
-for (const font of ['fonts/bogue-light-pdf.woff', 'fonts/acid-grotesk-light-pdf.woff']) {
+assert.ok(css.includes('Camy Lettering'), 'approved contact typography');
+for (const font of ['fonts/bogue-light-pdf.woff', 'fonts/acid-grotesk-light-pdf.woff', 'fonts/camy-lettering.woff']) {
   const response = await read(font);
   assert.ok(!response.headers.get('content-type')?.includes('text/html'));
   assert.ok((await response.arrayBuffer()).byteLength > 1000, font);

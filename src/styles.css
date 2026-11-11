@@ -95,6 +95,10 @@
 .site-header nav a{font-size:clamp(12px,1.4016vw,26.91px);letter-spacing:0;font-weight:300}
 .body-copy{line-height:1.412;font-weight:300}
 .contact-heading h1,.project-heading h1{font-family:"FFF Acid Grotesk Light PDF","DM Sans UI",Arial,sans-serif;font-weight:300}
+/* Recriação aprovada para este título; o arquivo contém apenas seus caracteres. */
+@font-face{font-family:"Camy Lettering";src:url("/fonts/camy-lettering.woff") format("woff");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0020,U+003F,U+0056,U+0061,U+0063,U+0065,U+006D-006F,U+0072-0073,U+0076}
+.contact-heading h1{font-family:"Camy Lettering",Georgia,serif;font-weight:400;letter-spacing:0;line-height:1.04}
+.contact-heading .contact-punctuation{font:inherit}
 @media(min-width:2000px){.wordmark{font-size:328px}}
 @media(max-width:680px){.wordmark{font-size:25vw;letter-spacing:-.072em}.site-header nav a{font-size:12px}.about-content h1{font-size:clamp(68px,19vw,110px)}}
 
