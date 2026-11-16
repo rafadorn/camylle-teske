@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile, mkdtemp, rename, rm, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, mkdtemp, rename, rm, readdir, cp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { publishedRecords, publicationVersion, makeSnapshot, validateSnapshot, snapshotStatus, MAX_PUBLISHED_PROJECTS } from '../src/publication.js';
 import { MAX_IMAGE_SIZE } from '../src/project.js';
 
@@ -49,13 +49,24 @@ export async function verifyDirectory(directory) {
 }
 
 export async function atomicDirectory(staged, directory) {
+  if (resolve(staged) === resolve(directory)) throw new Error('A nova publicação precisa de uma área separada.');
   const backup = directory + '.previous';
-  await mkdir(dirname(directory), { recursive: true });
-  await rm(backup, { recursive: true, force: true });
-  let previous = false;
-  try { await rename(directory, backup); previous = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  try { await rename(staged, directory); } catch (error) { if (previous) await rename(backup, directory); throw error; }
-  await rm(backup, { recursive: true, force: true });
+  const parent = dirname(resolve(directory));
+  await mkdir(parent, { recursive: true });
+  const workspace = await mkdtemp(join(parent, '.camy-publication-'));
+  const candidate = join(workspace, 'published');
+  try {
+    // /tmp and the checkout may be different filesystems. Prepare and verify a
+    // complete candidate next to the destination before touching the old copy.
+    try { await rename(staged, candidate); }
+    catch (error) { if (error.code !== 'EXDEV') throw error; await cp(staged, candidate, { recursive:true, errorOnExist:true, force:false }); }
+    await verifyDirectory(candidate);
+    await rm(backup, { recursive: true, force: true });
+    let previous = false;
+    try { await rename(directory, backup); previous = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    try { await rename(candidate, directory); } catch (error) { if (previous) await rename(backup, directory); throw error; }
+    await rm(backup, { recursive: true, force: true });
+  } finally { await rm(workspace, { recursive:true, force:true }); }
 }
 
 function publicRequest(url, key, fetcher) {

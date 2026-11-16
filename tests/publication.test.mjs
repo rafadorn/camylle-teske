@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { publishedRecords, publicationVersion, validateSnapshot } from '../src/publication.js';
-import { exportPublished, refreshPublished, verifyDirectory, limitedBytes, MAX_JSON_BYTES } from '../scripts/published-content.mjs';
+import { exportPublished, refreshPublished, verifyDirectory, limitedBytes, atomicDirectory, MAX_JSON_BYTES } from '../scripts/published-content.mjs';
 import { unpackSnapshot, archiveEntries, saveCache, restoreCache, cleanCache, publicationNeeded } from '../scripts/published-cache.mjs';
 import { fixtureProjects, fixtureAssets, writeFixture } from './publication-fixture.mjs';
 
@@ -105,6 +105,16 @@ test('invalid public manifests and image responses fail closed', async t => {
   const fixture = sourceFixture();
   const htmlImage = async (address, options) => String(address).includes('/object/sign/portfolio/') ? new Response('<html>evil</html>',{headers:{'content-type':'image/jpeg'}}) : fixture.fetcher(address, options);
   await assert.rejects(() => exportPublished({ url, key, directory: join(root,'bad'), fetcher: htmlImage }), /JPG/);
+});
+
+test('directory replacement validates its complete local candidate before touching the last publication', async t => {
+  const root=await temp(t); await writeFixture(root);
+  const directory=join(root,'published'),before=await readFile(join(directory,'portfolio.json'));
+  const next=join(root,'next');await writeFixture(next);
+  await writeFile(join(next,'published/unexpected.txt'),'not public');
+  await assert.rejects(()=>atomicDirectory(join(next,'published'),directory));
+  assert.deepEqual(await readFile(join(directory,'portfolio.json')),before);
+  await assert.rejects(()=>atomicDirectory(directory,directory));
 });
 
 test('durable archives restore only a verified snapshot and reject symlinks or unexpected files', async t => {
