@@ -1,11 +1,12 @@
 // Deployment smoke check: GET only, without executing analytics or accessing accounts.
 import assert from 'node:assert/strict';
+import { validateSnapshot } from '../src/publication.js';
 
 const site = new URL(process.env.PORTFOLIO_URL || 'https://camylle-teske.com.br/');
 assert.equal(site.protocol, 'https:');
 const checks = [
   ['', 'data-page="home"', 'class="wordmark"'],
-  ['projetos/', 'data-page="work"', 'Carregando trabalhos'],
+  ['projetos/', 'data-page="work"', 'class="works-view'],
   ['sobre/', 'data-page="about"', 'about-title'],
   ['contato/', 'data-page="contact"', 'mailto:teske.camy@gmail.com'],
   ['privacidade/', 'data-page="privacy"', 'Privacidade e suas escolhas'],
@@ -46,3 +47,13 @@ for (const font of ['fonts/bogue-light-pdf.woff', 'fonts/acid-grotesk-light-pdf.
   assert.ok((await response.arrayBuffer()).byteLength > 1000, font);
 }
 console.log('Public site OK: HTTPS, cover, pages, old project routes, fonts and CSP. No analytics events generated.');
+const publication = validateSnapshot(await (await read('published/portfolio.json')).json());
+const images = [...new Set(publication.projects.flatMap(project => project.media.map(media => media.local)))];
+// HEAD only: no visitor counters, private API calls or expiring storage links.
+for (let i = 0; i < images.length; i += 6) {
+  await Promise.all(images.slice(i, i + 6).map(async path => {
+    const response = await fetch(new URL(path, site), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    assert.ok(response.ok && response.headers.get('content-type')?.startsWith('image/'), 'local published image available');
+  }));
+}
+console.log(`Public snapshot OK: ${publication.projects.length} projects, ${images.length} local images. Supabase not required to view the portfolio.`);

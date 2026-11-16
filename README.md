@@ -4,7 +4,19 @@ Layout aprovado: capa com Camylle Teske em Bogue-Light, Sobre e Projetos em pág
 
 O título “Vamos conversar?” usa exclusivamente `public/fonts/camy-lettering.woff`, uma recriação visual aproximada aprovada em 11/11/2026. É uma fonte parcial feita a partir de lettering gerado com os prints como referência, com V maiúsculo e interrogação interpretados. Não é a Bogue original e não contém os binários do pacote DEMO. Sua cobertura se limita a espaço, `?`, `V`, `a`, `c`, `e`, `m`, `n`, `o`, `r`, `s` e `v`; não usar em outros textos sem conferir os caracteres.
 
-O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel `/admin/`. O Supabase guarda login, projetos e novas imagens. A Camy publica pelo painel, sem acessar GitHub, Wix ou arquivos de código.
+O código e as versões ficam no GitHub. O GitHub Pages serve o site, as imagens publicadas e o painel `/admin/`. O Supabase guarda login, projetos e originais das novas imagens. A Camy edita no painel; uma publicação no GitHub Actions transforma somente os trabalhos publicados em uma versão estática completa. Visitantes não consultam o banco nem precisam de URLs temporárias para ver os trabalhos.
+
+### Publicação estática e indisponibilidade do Supabase
+
+O workflow **Publicar portfólio** restaura a última cópia completa, consulta o Supabase com a chave publicável (sem sessão de administrador), baixa somente imagens referenciadas por trabalhos publicados e confirma que a seleção não mudou durante a exportação. Os layouts e a ordem são preservados. O arquivo público usa uma lista explícita de campos e imagens locais verificadas por SHA-256; não inclui rascunhos, contas, tokens, URLs assinadas ou colunas internas.
+
+A cópia fica como um arquivo público na release `portfolio-published`, com verificação de integridade, sem commits de imagens novas no histórico do código. O ponteiro só muda após completar o upload; arquivos de versões anteriores são removidos. `public/published/` é gerado e ignorado pelo Git. Nunca substituir uma cópia válida por dados parciais ou pelos seis trabalhos de demonstração.
+
+Cada push em `main` ou execução manual de **Actions → Publicar portfólio → Run workflow** tenta atualizar a publicação. A sincronização automática a cada 15 minutos foi autorizada em 16/11/2026, separadamente da rotina de saúde. Ela consulta somente os trabalhos publicados e encerra sem baixar imagens ou reconstruir o site se não houver mudança ou o banco estiver indisponível. Os horários do GitHub Actions podem atrasar; em repositórios públicos, rotinas podem ser desativadas após 60 dias sem atividade e precisam ser reativadas pelo proprietário. A execução manual continua disponível.
+
+O painel distingue trabalhos salvos de alterações já entregues no site. **Salvar como rascunho**, excluir, reordenar e mudar imagens passam a valer no site ao concluir a próxima publicação completa.
+
+Se o Supabase estiver pausado ou a exportação falhar, a última cópia íntegra continua sendo publicada, inclusive em mudanças de código. Sem cópia válida, o pipeline falha e preserva o site anterior. Login, edição e estatísticas ainda dependem do Supabase. A cópia pública não é um backup dos rascunhos, contas ou originais privados.
 
 ## O que já está preparado
 
@@ -13,7 +25,7 @@ O código e as versões ficam no GitHub. O GitHub Pages serve o site e o painel 
 - Enviar JPG, PNG e WebP, escolher capa e ordenar a galeria.
 - Salvar rascunho, publicar e retirar um trabalho do portfólio.
 - Capa única ou três primeiras imagens lado a lado.
-- Grade e páginas atualizadas pelo banco, sem reconstruir o site a cada trabalho.
+- Grade e páginas geradas a partir dos trabalhos publicados, com imagens locais e layouts preservados.
 - Importar os seis projetos iniciais pelo próprio painel.
 - Publicação automática pelo GitHub Actions e suporte a domínio próprio.
 
@@ -158,7 +170,7 @@ As escolhas são valores predefinidos, sem HTML, CSS ou scripts enviados pelo pa
 
 Para editar, clicar **Editar** na lista. Para retirar um projeto do ar, salvar como rascunho. Para ajustar a ordem do portfólio, usar **Subir** / **Descer** na lista.
 
-As páginas de novos projetos usam `/projeto/?trabalho=nome-do-projeto`. Essa rota funciona diretamente no GitHub Pages sem depender de redirecionamentos de erro 404. As seis rotas anteriores `/projetos/.../` também foram preservadas. As páginas dinâmicas exigem JavaScript para carregar novos trabalhos; o GitHub Pages não oferece renderização de servidor.
+As capas da versão estática abrem `/projetos/nome-do-projeto/`, gerado em cada publicação e utilizável sem JavaScript. A rota anterior `/projeto/?trabalho=nome-do-projeto` permanece compatível, lendo apenas o arquivo público local. Endereços de trabalhos retirados deixam de incluir seus textos e imagens na próxima publicação.
 
 ## Desenvolvimento
 
@@ -166,6 +178,7 @@ Requer Node.js 24 e npm.
 
 ```sh
 npm ci
+npm run snapshot:refresh
 npm run dev
 ```
 
@@ -188,6 +201,6 @@ TEST_BASE_PATH=/camylle-teske/ npm run test:browser
 
 Os testes de segurança executam o SQL em Postgres via PGlite, com papéis anon/authenticated e identidade simulada. Verificam leitura pública, isolamento de rascunhos e mídias, bloqueio de usuários sem permissão, escrita, publicação, retirada do ar, exclusão, ordenação e a consulta de auditoria. Os testes de navegador geram um bundle de produção separado com um contrato controlado do Supabase. Verificam CSP, bloqueio do painel em HTTP, menus, contato, recuperação, saída entre abas e telas de 320, 390 e 430 pixels. A configuração de teste nunca é publicada. A ativação final deve confirmar os fluxos na instância real do Supabase.
 
-Dados novos ficam no Supabase, não em commits Git. Fazer backup/exportação do banco e armazenamento conforme o plano contratado. Os limites e condições dos serviços devem ser conferidos nas contas de vocês.
+Os dados de edição e originais ficam no Supabase; uma cópia somente do conteúdo publicado fica no GitHub. Fazer backup separado do banco e do armazenamento privado. Os limites e condições dos serviços devem ser conferidos nas contas de vocês.
 
 Os trabalhos e fotografias pertencem a Camylle Teske. A fonte DM Sans acompanha sua licença OFL em `public/fonts/OFL-dm-sans.txt`.

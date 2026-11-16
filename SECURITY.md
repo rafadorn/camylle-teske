@@ -10,7 +10,9 @@
 - Textos são escapados antes de entrar no HTML; uploads aceitam somente JPG, PNG e WebP, até 8 MB por arquivo.
 - A saída ou expiração da sessão remove o editor. Erros de autenticação e recuperação liberam os controles para tentar novamente.
 - O build rejeita chaves secretas. A chave publicável do Supabase é intencionalmente pública.
-- O CI usa Actions com versões fixadas por SHA. O build tem acesso de leitura; apenas o deploy recebe permissão de publicar. Auditoria de dependências de produção, testes e build precedem a publicação.
+- O CI usa Actions com versões fixadas por SHA. O job de build pode gravar a cópia pública na release do repositório; somente o deploy tem permissão de publicar no Pages. O `GITHUB_TOKEN` temporário é fornecido apenas às etapas de arquivo, nunca ao navegador ou ao exportador do Supabase. Auditoria de dependências de produção, testes e build precedem a publicação.
+- A versão pública usa apenas o arquivo e as imagens locais da última publicação completa. A exportação lê explicitamente trabalhos com `status=published` sob o papel público, projeta campos permitidos, limita formatos/tamanhos e confirma novamente a versão antes de trocar a cópia. Falha parcial preserva a cópia anterior. Downloads de imagens e arquivos públicos não recebem tokens do GitHub nem credenciais de sessão.
+- O arquivo da release só pode conter JSON validado e imagens de nomes SHA-256; links, travessia de diretórios, arquivos extras e tamanhos excessivos são rejeitados antes de extração. O hash do arquivo é verificado antes da restauração.
 
 ## Confirmar nas contas de produção
 
@@ -26,7 +28,7 @@ O ambiente de desenvolvimento não consegue consultar o banco ou as configuraç�
 
 ## Limites de privacidade
 
-Um trabalho público e suas imagens podem ser copiados. Despublicar bloqueia novas leituras permitidas pelas políticas, mas URLs já assinadas podem continuar válidas até expirar. Os cinco minutos usados pela interface não são um limite de revogação garantido pelo servidor. Os originais incluídos neste repositório sempre foram públicos.
+Um trabalho público e suas imagens podem ser copiados. Despublicar bloqueia novas leituras no banco e armazenamento conforme as políticas, mas a retirada da cópia estática só ocorre na próxima publicação completa. Durante uma indisponibilidade do banco, o site continua exibindo a última publicação. A exportação remove mídias não referenciadas e o cache do GitHub remove os arquivos anteriores; cópias baixadas, caches de visitantes e URLs anteriormente assinadas não podem ser recolhidos. Os originais incluídos neste repositório sempre foram públicos.
 
 Uploads preservam o arquivo original, inclusive metadados que ele contenha. Antes de publicar fotos pessoais, remover localização e demais dados pessoais de EXIF. O painel não faz remoção automática: uma conversão sem tratar orientação, cor e animação poderia alterar os trabalhos.
 

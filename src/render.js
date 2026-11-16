@@ -2,6 +2,7 @@ import { coverMedia, escapeHTML as e } from './project.js';
 import { cardLayout, imageWidth, imageAlign, hasImageLayout } from './layout.js';
 
 export function projectURL(project, base = '/') {
+  if (project.public_path === `projetos/${project.slug}/`) return base + project.public_path;
   return `${base}projeto/?trabalho=${encodeURIComponent(project.slug)}`;
 }
 

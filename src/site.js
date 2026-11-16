@@ -5,13 +5,13 @@ import './layout.css';
 import './menu.js';
 import './navigation.css';
 import { pageNavigation, projectNavigation } from './navigation.js';
-import initialProjects from './initial-projects.json';
-import { configured, listProjects } from './backend.js';
+import { readPublished } from './publication.js';
 import { works, detail } from './render.js';
 
 const main = document.querySelector('main');
 const page = main.dataset.page;
 const base = import.meta.env.BASE_URL;
+const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
 const privacy = createPrivacy({ base, endpoint: configured ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/record-portfolio-view' : '', publicKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '' });
 if (page === 'home') privacy?.page('/');
 if (page === 'about') privacy?.page('/sobre/');
@@ -20,11 +20,10 @@ if (page === 'privacy') privacy?.page('/privacidade/');
 
 async function load() {
   if (!['work', 'project'].includes(page)) return;
-  // A versão estática só é usada antes de ativar o banco, nunca em uma falha dele.
-  if (configured) main.innerHTML = '<p class="page-message" role="status">Carregando trabalhos…</p>';
   if (page === 'project') document.querySelector('[data-page-controls]').innerHTML = pageNavigation('project', base);
   try {
-    const projects = configured ? await listProjects() : initialProjects;
+    // The public site reads its own complete publication, never the live database.
+    const { projects } = await readPublished(base);
     if (page === 'work') { main.innerHTML = works(projects, base); privacy?.page('/projetos/'); return; }
     const slug = main.dataset.slug || new URLSearchParams(location.search).get('trabalho');
     const project = projects.find(p => p.slug === slug);
@@ -39,18 +38,10 @@ async function load() {
     document.querySelector('[data-page-controls]').innerHTML = projectNavigation(project, projects, base);
     privacy?.page('/projetos/' + project.slug + '/');
   } catch {
+    // Pre-rendered pages remain useful if the local JSON temporarily fails.
+    if (main.querySelector('.works-view,.project-detail')) return;
     main.innerHTML = '<div class="page-message" role="alert"><p>Não foi possível carregar os trabalhos agora.</p><button type="button" class="retry">Tentar novamente</button></div>';
     main.querySelector('button').addEventListener('click', load);
-  }
+  } finally { main.dataset.publicationReady = 'true'; }
 }
 load();
-// Atualiza as URLs de mídia quando a aba volta a ser usada.
-document.addEventListener('visibilitychange', () => { if (!document.hidden && configured) load(); });
-setInterval(async () => {
-  if (!configured || document.hidden || !['work', 'project'].includes(page)) return;
-  try {
-    const projects = await listProjects();
-    const urls = new Map(projects.flatMap(p => p.media.map(m => [m.path, m.url])));
-    main.querySelectorAll('img[data-media-path]').forEach(image => { if (urls.has(image.dataset.mediaPath)) image.src = urls.get(image.dataset.mediaPath); });
-  } catch { /* Uma falha temporária não apaga uma página já carregada. */ }
-}, 240_000);

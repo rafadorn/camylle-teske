@@ -2,10 +2,13 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
-import { readFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp, rm, cp, readdir } from 'node:fs/promises';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { brazilDay } from '../src/analytics-path.js';
+import { fixtureSnapshot, writeFixture } from './publication-fixture.mjs';
+import { snapshotStatus } from '../src/publication.js';
 
 const origin = 'http://127.0.0.1:4179';
 const api = 'https://camylle-test.supabase.co';
@@ -20,11 +23,28 @@ const requests = [];
 const analyticsEvents = [];
 const fixtureDirectory = await mkdtemp(join(tmpdir(), 'camylle-browser-'));
 const fixtureBuild = join(fixtureDirectory, 'dist');
-const fixtureEnv = { ...process.env, VITE_SUPABASE_URL: api, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_BASE_PATH: base };
+const fixturePublic = join(fixtureDirectory, 'public');
+await cp(new URL('../public/', import.meta.url), fixturePublic, { recursive: true });
+await rm(join(fixturePublic,'published'),{recursive:true,force:true});
+await writeFixture(fixturePublic);
+let publication = await fixtureSnapshot(projects);
+const publishFixture = async () => { publication = await fixtureSnapshot(projects); };
+const publicRoutes = async context => {
+  await context.route(origin + base + 'published/portfolio.json', route => route.fulfill({ contentType:'application/json',body:JSON.stringify(publication) }));
+  await context.route(origin + base + 'published/status.json**', route => route.fulfill({ contentType:'application/json',body:JSON.stringify(snapshotStatus(publication)) }));
+  // Simulate an HTML deployment for newly published fixture projects.
+  await context.route(origin+base+'projetos/*/', async route => {
+    const slug=new URL(route.request().url()).pathname.split('/').filter(Boolean).at(-1);
+    const html=(await readFile(join(fixtureBuild,'projeto/index.html'),'utf8')).replace('data-slug=""',`data-slug="${slug}"`);
+    return route.fulfill({contentType:'text/html',body:html});
+  });
+};
+const fixtureEnv = { ...process.env, PORTFOLIO_PUBLIC_DIR: fixturePublic, VITE_SUPABASE_URL: api, VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test_only', VITE_BASE_PATH: base };
 // QA uses a separate production bundle; restore the real source configuration.
+const generatedPaths = ['index.html','404.html','admin/index.html','projeto/index.html','projetos/index.html','sobre/index.html','contato/index.html','privacidade/index.html',...(await readdir(new URL('../projetos/',import.meta.url),{withFileTypes:true})).filter(entry=>entry.isDirectory()).map(entry=>'projetos/'+entry.name+'/index.html')];
+const originalPages = await Promise.all(generatedPaths.map(async path => [new URL('../'+path,import.meta.url), await readFile(new URL('../'+path,import.meta.url))]));
 const restorePages = () => {
-  const result = spawnSync('node', ['scripts/generate-pages.mjs'], { encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
+  for (const [path,bytes] of originalPages) writeFileSync(path,bytes);
 };
 let server, browser;
 try {
@@ -106,6 +126,7 @@ try {
     throw new Error(`Unhandled request: ${request.method()} ${url.pathname}`);
   }
   await context.route(api + '/**', fixture);
+  await publicRoutes(context);
   const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await mkdir(new URL('../test-results/', import.meta.url), { recursive: true });
@@ -167,7 +188,8 @@ try {
   await page.getByLabel('Ver prévia em', { exact: true }).selectOption('phone');
   assert.ok((await page.locator('.layout-preview').boundingBox()).width <= 390);
   await page.getByRole('button', { name: 'Salvar layout da grade', exact: true }).click();
-  await page.getByText('Layout da grade salvo no portfólio.').waitFor();
+  await page.getByText('Layout da grade salvo. Aguarde a atualização da versão pública.').waitFor();
+  await publishFixture();
   assert.equal(projects[0].slug,'leao-ice-bubble-tea');
   assert.equal(projects.find(project=>project.slug==='odara-tattoo').card_layout,'wide');
   const layoutVisitor=await context.newPage();
@@ -179,7 +201,8 @@ try {
   await page.getByRole('button', { name: 'Mover Odara Tattoo para antes', exact: true }).click();
   await page.getByRole('button', { name: 'Usar tamanhos automáticos', exact: true }).click();
   await page.getByRole('button', { name: 'Salvar layout da grade', exact: true }).click();
-  await page.getByText('Layout da grade salvo no portfólio.').waitFor();
+  await page.getByText('Layout da grade salvo. Aguarde a atualização da versão pública.').waitFor();
+  await publishFixture();
   assert.equal(projects[0].slug,'odara-tattoo');
   assert.ok(projects.every(project=>project.card_layout==='auto'));
   // Another tab changing a project makes a stale layout fail without overwriting it.
@@ -194,7 +217,8 @@ try {
   await page.reload();
   await page.getByRole('heading', { name:'Trabalhos', exact:true }).waitFor();
   await page.getByRole('button', { name: 'Subir Leão Ice Bubble Tea', exact: true }).click();
-  await page.getByText('Ordem atualizada no portfólio.').waitFor();
+  await page.getByText('Ordem salva. Aguarde a atualização da versão pública.').waitFor();
+  await publishFixture();
   assert.equal(await page.locator('.row-info h2').first().textContent(), 'Leão Ice Bubble Tea');
   await mkdir(new URL('../test-results/', import.meta.url), { recursive: true });
   await page.screenshot({ path: 'test-results/admin-desktop.png', fullPage: true });
@@ -253,7 +277,7 @@ try {
   assert.equal(await page.getByLabel('Título',{exact:true}).isVisible(),true);
   await page.getByLabel('Título',{exact:true}).fill('Novo projeto de teste');
   await page.getByRole('button', { name: 'Salvar como rascunho', exact: true }).click();
-  await page.getByText('Rascunho salvo. Ele não aparece no portfólio.').waitFor();
+  await page.getByText('Rascunho salvo. Se estava publicado, a retirada será aplicada na próxima publicação do site.').waitFor();
   await page.reload();
   await page.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
   assert.equal(await page.locator('.work-row').count(), 7);
@@ -267,24 +291,32 @@ try {
   assert.equal(await page.getByRole('button',{name:'Definir tamanho: Metade',exact:true}).getAttribute('aria-pressed'),'true');
   assert.equal(await page.locator('.image-inspector').getByRole('button',{name:'Direita',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('button', { name: 'Salvar e publicar', exact: true }).click();
-  await page.getByText('Trabalho publicado no portfólio.').waitFor();
+  await page.getByText('Trabalho salvo para publicação. Confira abaixo quando a versão pública estiver atualizada.').waitFor();
+  await page.locator('[data-publication-state="pending"]').waitFor();
+  await publicPage.reload();
+  await publicPage.locator('main[data-publication-ready="true"]').waitFor();
+  assert.equal(await publicPage.getByRole('link',{name:'Ver projeto Novo projeto de teste',exact:true}).count(),0,'saving alone does not replace the delivered public version');
+  await publishFixture();
+  await page.getByRole('button',{name:'Conferir publicação',exact:true}).click();
+  await page.locator('[data-publication-state="current"]').waitFor();
   await publicPage.reload();
   await publicPage.getByRole('link', { name: 'Ver projeto Novo projeto de teste', exact: true }).waitFor();
   assert.equal(await publicPage.locator('.project').count(), 7);
   await publicPage.getByRole('link', { name: 'Ver projeto Novo projeto de teste', exact: true }).click();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
-  assert.ok(publicPage.url().includes('projeto/?trabalho=novo-projeto-de-teste'));
+  assert.ok(publicPage.url().includes('projetos/novo-projeto-de-teste/'));
   assert.equal(await publicPage.locator('.media-layout-gallery img').count(), 7);
   assert.equal(await publicPage.locator('.media-width-half.media-align-right img').getAttribute('alt'), 'Segunda imagem.');
   await publicPage.reload();
   await publicPage.getByRole('heading', { name: 'Novo projeto de teste', exact: true }).waitFor();
-  // A atualização pública não reapresenta o conteúdo estático em uma falha do banco.
+  // Public work and local images remain accessible while the backend is down.
   await publicPage.route(api + '/rest/v1/projects**', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'offline' }) }));
   await publicPage.goto(origin + base + 'projetos/');
-  await publicPage.getByText('Não foi possível carregar os trabalhos agora.').waitFor();
-  assert.equal(await publicPage.locator('.project').count(), 0);
+  await publicPage.locator('main[data-publication-ready="true"]').waitFor();
+  assert.equal(await publicPage.locator('.project').count(), 7);
+  await publicPage.locator('.project img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+  assert.ok(await publicPage.locator('.project img').evaluateAll(images=>images.every(image=>new URL(image.src).origin===location.origin)));
   await publicPage.unroute(api + '/rest/v1/projects**');
-  await publicPage.getByRole('button', { name: 'Tentar novamente', exact: true }).click();
   await publicPage.locator('.project').first().waitFor();
   // Production CSP blocks inline script execution even if a node is inserted.
   await publicPage.evaluate(() => {
@@ -305,7 +337,8 @@ try {
   await page.screenshot({ path: 'test-results/editor-mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.getByRole('button', { name: 'Salvar como rascunho', exact: true }).click();
-  await page.getByText('Rascunho salvo. Ele não aparece no portfólio.').waitFor();
+  await page.getByText('Rascunho salvo. Se estava publicado, a retirada será aplicada na próxima publicação do site.').waitFor();
+  await publishFixture();
   await publicPage.reload();
   await publicPage.locator('.project').first().waitFor();
   assert.equal(await publicPage.locator('.project').count(), 6);
@@ -394,7 +427,9 @@ try {
   try {
     for (const count of [0, 1, 4, 5, 7, 12, 13]) {
       projects = Array.from({ length: count }, (_, index) => ({ ...seed[index % seed.length], id: String(index), slug: `fixture-${index}` }));
+      await publishFixture();
       await visual.goto(origin + base + 'projetos/');
+      await visual.locator('main[data-publication-ready="true"]').waitFor();
       if (count) await visual.locator('.project').first().waitFor();
       else await visual.getByText('Novos trabalhos chegam em breve.').waitFor();
       assert.equal(await visual.locator('.project').count(), count);
@@ -405,7 +440,7 @@ try {
         for (let j = 0; j < i; j++) assert.ok(boxes[i].right <= boxes[j].x || boxes[j].right <= boxes[i].x || boxes[i].bottom <= boxes[j].y || boxes[j].bottom <= boxes[i].y, 'project cards never overlap');
       }
     }
-  } finally { projects = originalProjects; }
+  } finally { projects = originalProjects; await publishFixture(); }
   await visual.goto(origin + base + 'projetos/');
   await visual.locator('.project').first().waitFor();
   const firstCard = visual.locator('.project').first();
@@ -420,9 +455,43 @@ try {
   assert.equal(await visual.locator('.nav-highlight').evaluate(node => getComputedStyle(node).transitionDuration), '0s');
   await visual.close();
 
+  // A fresh visitor can browse the last publication with all backend services down.
+  for (const width of [320, 1440]) {
+    const offline = await browser.newContext({ viewport:{width,height:900} });
+    let backendRequests = 0;
+    await offline.route(api+'/**',route=>{backendRequests++;return route.abort();});
+    await publicRoutes(offline);
+    const visitor=await offline.newPage();
+    await visitor.goto(origin+base+'projetos/');
+    await visitor.locator('main[data-publication-ready="true"]').waitFor();
+    assert.equal(await visitor.locator('.project').count(),publication.projects.length);
+    await visitor.locator('.project img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+    await visitor.screenshot({path:`test-results/offline-portfolio-${width}.png`,fullPage:true});
+    await visitor.locator('.project').first().click();
+    await visitor.locator('.project-detail').waitFor();
+    await visitor.locator('.project-detail img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+    assert.equal(await visitor.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.equal(backendRequests,0,'public navigation needs no database, auth or remote storage requests');
+    await visitor.screenshot({path:`test-results/offline-project-${width}.png`,fullPage:true});
+    await visitor.goto(origin+base+'projeto/?trabalho='+publication.projects[0].slug);
+    await visitor.locator('.project-detail').waitFor();
+    assert.equal(backendRequests,0,'previous query-string URLs remain compatible without a backend');
+    await offline.close();
+  }
+  const noJS=await browser.newContext({javaScriptEnabled:false});
+  await noJS.route(api+'/**',route=>route.abort());
+  const staticPage=await noJS.newPage();
+  await staticPage.goto(origin+base+'projetos/');
+  assert.equal(await staticPage.locator('.project').count(),seed.length,'grid works before JavaScript');
+  await staticPage.locator('.project').first().click();
+  await staticPage.getByRole('heading',{name:seed[0].title,exact:true}).waitFor();
+  await staticPage.locator('.project-detail img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+  await noJS.close();
+
   // Exercise public navigation and touch layouts at narrow phone widths.
   const touch = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await touch.route(api + '/**', fixture);
+  await publicRoutes(touch);
   const mobile = await touch.newPage();
   mobile.on('pageerror', error => errors.push(error.message));
   for (const width of [320, 390, 430]) {

@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Publication synchronization explicitly authorized on 2026-11-16.
+  schedule:
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: read
@@ -14,11 +17,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
-      contents: read
+      # Only this job stores a public archive; the browser gets no GitHub credential.
+      contents: write
       # configure-pages consulta o caminho atual, inclusive após ligar um domínio.
       pages: read
+    outputs:
+      publish: ${{ steps.sync.outputs.publish }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -27,26 +33,66 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Conferir se há conteúdo público novo
+        id: sync
+        run: node scripts/published-cache.mjs probe
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - run: npm ci
+        if: steps.sync.outputs.publish == 'true'
       - name: Verificar vulnerabilidades de produção
+        if: steps.sync.outputs.publish == 'true'
         run: npm audit --omit=dev --audit-level=high
       - run: npm test
+        if: steps.sync.outputs.publish == 'true'
+      - name: Restaurar última publicação completa
+        if: steps.sync.outputs.publish == 'true'
+        run: node scripts/published-cache.mjs restore
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Exportar somente trabalhos e imagens publicados
+        if: steps.sync.outputs.publish == 'true'
+        id: snapshot
+        run: node scripts/refresh-published.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - name: Verificar coleta e permissões sem gerar acessos
+        if: steps.snapshot.outputs.backend_available == 'true'
         run: node scripts/check-analytics.mjs
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        if: steps.sync.outputs.publish == 'true'
         id: pages
       - run: npm run build
+        if: steps.sync.outputs.publish == 'true'
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+      - name: Conferir publicação independente do banco
+        if: steps.sync.outputs.publish == 'true'
+        run: node scripts/check-static-dist.mjs
+      - name: Guardar cópia pública verificada no GitHub
+        if: steps.sync.outputs.publish == 'true'
+        run: node scripts/published-cache.mjs save
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Remover arquivos de publicações anteriores
+        if: steps.sync.outputs.publish == 'true'
+        run: node scripts/published-cache.mjs clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        if: steps.sync.outputs.publish == 'true'
         with:
           path: dist
   deploy:
+    if: needs.build.outputs.publish == 'true'
     permissions:
       pages: write
       id-token: write

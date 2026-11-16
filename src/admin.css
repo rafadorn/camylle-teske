@@ -57,3 +57,8 @@ button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer;bo
 .media-preview .media-layout-gallery{gap:12px}.media-preview .media-frame{margin:0}.media-preview .media-frame img{width:100%;height:auto}
 .media-preview.preview-phone .project-cover.triptych{grid-template-columns:1fr}
 @media(max-width:720px){.layout-control{grid-template-columns:1fr;gap:12px}.layout-position button{flex:1}.layout-position{width:100%}.layout-toolbar{align-items:stretch}.layout-toolbar>*{width:100%}.heading-actions{flex-wrap:wrap}.cover-layout-editor .save-bar{align-items:stretch}.media-placement{grid-template-columns:1fr}.layout-preview{padding:10px}}
+/* Saved editor state and the last delivered public version are distinct. */
+.publication-status{display:flex;align-items:center;justify-content:space-between;gap:24px;border:1px solid #ddd;padding:20px;margin:24px 0}
+.publication-status h2{font-size:16px;margin:0 0 8px}.publication-status p{font-size:14px;line-height:1.5;margin:0;color:#555}.publication-status button{flex:none}
+.publication-status[data-publication-state=pending]{border-color:#b39a66;background:#fffdf7}
+@media(max-width:680px){.publication-status{align-items:stretch;flex-direction:column;gap:16px}}

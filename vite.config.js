@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => {
   validatePublicConfig(env);
   return {
     base: env.VITE_BASE_PATH || '/',
+    publicDir: env.PORTFOLIO_PUBLIC_DIR || 'public',
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
       'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_SUPABASE_PUBLISHABLE_KEY),

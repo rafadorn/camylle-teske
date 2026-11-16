@@ -1,4 +1,5 @@
 import { mountAnalytics } from './admin-analytics.js';
+import { mountPublication } from './admin-publication.js';
 import './admin-base.css';
 import './admin.css';
 import './layout.css';
@@ -204,7 +205,7 @@ function openCoverLayout() {
         dirty = false;
         const loaded = await listProjects(true);
         if (!auth.current(ticket)) return;
-        projects = loaded; overview('Layout da grade salvo no portfólio.');
+        projects = loaded; overview('Layout da grade salvo. Aguarde a atualização da versão pública.');
       } catch (error) {
         if (!auth.current(ticket) || expired(error)) return;
         if (committed) {
@@ -225,6 +226,7 @@ function overview(notice = '') {
   root.querySelector('#logout').addEventListener('click', signOut);
   root.querySelector('#new').addEventListener('click', () => openEditor());
   root.querySelector('#layout').addEventListener('click', openCoverLayout);
+  mountPublication(root.querySelector('.work-list'), { projects, base, auth });
   mountAnalytics(root.querySelector('.work-list'), { client, auth, expired, friendlyError, base });
   root.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => openEditor(projects.find(p => p.id === button.dataset.edit))));
   root.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', async () => {
@@ -238,7 +240,7 @@ function overview(notice = '') {
       if (!auth.current(ticket)) return;
       const loaded = await listProjects(true);
       if (!auth.current(ticket)) return;
-      projects = loaded; overview('Ordem atualizada no portfólio.');
+      projects = loaded; overview('Ordem salva. Aguarde a atualização da versão pública.');
     } catch (error) {
       if (auth.current(ticket) && !expired(error)) { overview(); message(friendlyError(error), true); }
     } finally { if (auth.current(ticket)) saving = false; }
@@ -281,7 +283,7 @@ function openEditor(project) {
   };
   editor.isNew = !project; editor.originalPaths = project?.media.map(m => m.path) || [];
   dirty = false;
-  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div>${editorNavigation(project)}<form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><div class="image-layout-launch"><button type="button" class="secondary" data-open-image-layout>Montar layout das imagens</button><p>Abra a montagem visual para posicionar as imagens e ajustar os tamanhos.</p></div><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está no portfólio.' : 'Rascunhos ficam visíveis apenas no painel.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
+  root.innerHTML = `<section class="edit-section"><div class="panel-heading"><div><p class="eyebrow">${project ? 'Editar trabalho' : 'Novo trabalho'}</p><h1>${project ? e(project.title) : 'Dê forma à próxima ideia.'}</h1></div><button class="plain" type="button" id="back">Voltar aos trabalhos</button></div>${editorNavigation(project)}<form id="project-form"><div class="editor-grid"><div class="editor-copy"><label>Título<input name="title" value="${e(editor.title)}" maxlength="160" required placeholder="Nome do projeto"></label><label>Categoria<input name="category" value="${e(editor.category)}" maxlength="160" placeholder="Ex.: Identidade visual"></label><label>Sobre o trabalho<textarea name="description" rows="8" maxlength="12000" placeholder="Conte a ideia, o processo e o resultado.">${e(editor.description)}</textarea></label><label>Endereço do trabalho<input name="slug" value="${e(editor.slug)}" maxlength="100" pattern="[a-z0-9]+(-[a-z0-9]+)*" required ${project ? 'readonly' : ''}><small>O endereço fica fixo depois de salvar para preservar os links.</small></label><label>Composição da capa<select name="cover_layout" aria-label="Composição da capa"><option value="single" ${editor.cover_layout === 'single' ? 'selected' : ''}>Uma imagem</option><option value="triptych" ${editor.cover_layout === 'triptych' ? 'selected' : ''}>Três primeiras imagens lado a lado</option></select></label></div><div class="editor-images"><div class="section-heading"><h2>Imagens</h2><span data-count></span></div><p class="muted">Escolha a capa e organize as imagens do projeto.</p><div class="image-layout-launch"><button type="button" class="secondary" data-open-image-layout>Montar layout das imagens</button><p>Abra a montagem visual para posicionar as imagens e ajustar os tamanhos.</p></div><label class="upload-zone"><span>Adicionar imagens</span><small>JPG, PNG ou WebP · até 8 MB por imagem</small><input id="upload" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="media-list"></div><section class="image-layout-section" aria-labelledby="image-layout-title"><h2 id="image-layout-title">Prévia da página do trabalho</h2><p class="muted">Largura e alinhamento mudam a composição. A capa da grade é escolhida separadamente. Salve o trabalho para aplicar.</p><label>Ver imagens em<select id="image-preview-device"><option value="desktop">Computador</option><option value="phone">Celular</option></select></label><div class="media-preview" aria-label="Prévia das imagens do trabalho"></div><button type="button" class="plain" id="reset-image-layout">Restaurar disposição automática</button></section></div></div><p data-message aria-live="polite"></p><div class="save-bar"><span class="save-hint">${editor.status === 'published' ? 'Este trabalho está marcado para publicação.' : 'Rascunhos não entram na próxima publicação.'}</span><div><button type="button" class="secondary" id="draft">Salvar como rascunho</button><button type="submit" class="primary">${editor.status === 'published' ? 'Salvar e manter publicado' : 'Salvar e publicar'}</button></div></div>${project ? '<button type="button" class="delete-button" id="delete">Excluir trabalho</button>' : ''}</form></section>`;
   root.querySelector('#back').addEventListener('click', () => { if (leaveEditor()) overview(); });
   root.querySelector('[data-editor-home]').addEventListener('click', () => { if (leaveEditor()) overview(); });
   root.querySelectorAll('[data-editor-step]').forEach(button => button.addEventListener('click', () => {
@@ -378,7 +380,7 @@ function openEditor(project) {
       if (!current()) return;
       const loaded = await listProjects(true);
       if (!current()) return;
-      saving = false; dirty = false; leaveEditor(); projects = loaded; overview('Trabalho excluído.');
+      saving = false; dirty = false; leaveEditor(); projects = loaded; overview('Trabalho excluído. A retirada do site será aplicada na próxima publicação.');
     } catch (error) {
       if (!current() || expired(error)) return;
       // A exclusão do registro pode ter sido concluída mesmo que a limpeza falhe.
@@ -470,7 +472,7 @@ async function persist(status) {
     // A gravação já foi concluída. Uma falha de atualização da tela não desfaz a publicação.
     dirty = false;
     const removed = editing.originalPaths.filter(path => !record.media.some(m => m.path === path));
-    let notice = status === 'published' ? 'Trabalho publicado no portfólio.' : 'Rascunho salvo. Ele não aparece no portfólio.';
+    let notice = status === 'published' ? 'Trabalho salvo para publicação. Confira abaixo quando a versão pública estiver atualizada.' : 'Rascunho salvo. Se estava publicado, a retirada será aplicada na próxima publicação do site.';
     try { await removeImages(removed); }
     catch (error) { if (!current() || expired(error)) return; notice += ' Algumas imagens antigas precisam de limpeza no armazenamento.'; }
     if (!current()) return;
